@@ -1,8 +1,9 @@
 mod handlers;
 mod models;
+mod utils;
 
 use dotenvy::dotenv;
-use handlers::{create_items,get_items};
+use handlers::items::{create_items,get_items};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
