@@ -3,7 +3,7 @@ mod models;
 mod utils;
 
 use dotenvy::dotenv;
-use handlers::items::{create_items,get_items};
+use handlers::{items::{create_items,get_items}, users::{create_user, login_user}};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
@@ -20,6 +20,8 @@ async fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
         .app_data(web::Data::new(pool.clone()))
+        .route("/register", web::post().to(create_user))
+        .route("/login", web::post().to(login_user))
         .route("/create-item", web::post().to(create_items))
         .route("/", web::get().to(get_items))
     }).bind(("127.0.0.1", 8080))?.run().await

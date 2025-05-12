@@ -1,7 +1,7 @@
 
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
-use crate::models::{Item, CreateItem};
+use crate::models::models::{Item, CreateItem};
 
 pub async fn create_items(
     pool: web::Data<MySqlPool>,
