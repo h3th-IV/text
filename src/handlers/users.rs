@@ -1,19 +1,28 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+    Argon2, PasswordHash, PasswordVerifier,
+};
 use sqlx::MySqlPool;
 
-use crate::{models::users::{CreateUser, LoginUser, UpdateBalance, User}, utils::emailval::validate_email};
+use crate::{
+    models::users::{CreateUser, LoginUser, User},
+    utils::emailval::validate_email,
+};
 
 pub async fn create_user(
     pool: web::Data<MySqlPool>,
     user: web::Json<CreateUser>,
 ) -> impl Responder {
-    validate_email(&user.email);
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let new_password = argon2.hash_password(user.password.as_bytes(), &salt).unwrap().to_string();
     let users = sqlx::query_as!(
         User,
         "insert into users(name, email, password, balance) values (?,?,?,?)",
         user.name,
         user.email,
-        user.password,
+        new_password,
         0
     )
     .execute(pool.get_ref())
@@ -44,8 +53,8 @@ pub async fn create_user(
     }
 }
 
-pub async fn fetch_user(pool: web::Data<MySqlPool>) -> Option<User> {
-    let user = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users")
+pub async fn fetch_user(pool: web::Data<MySqlPool>, email:String) -> Option<User> {
+    let user = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where email = ?",email)
         .fetch_one(pool.get_ref())
         .await;
     match user {
@@ -60,10 +69,7 @@ pub async fn fetch_user(pool: web::Data<MySqlPool>) -> Option<User> {
     }
 }
 
-pub async fn login_user(
-    pool: web::Data<MySqlPool>,
-    user: web::Json<LoginUser>,
-) -> impl Responder {
+pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) -> impl Responder {
     if user.email.is_empty() {
         return HttpResponse::Ok().json("email is empty");
     }
@@ -84,9 +90,11 @@ pub async fn login_user(
     .fetch_one(pool.get_ref())
     .await;
     if let Ok(user_e) = user_exists {
-        let fetch_user = fetch_user(pool).await;
+        let fetch_user = fetch_user(pool,user_e.email.clone()).await;
         let f_user_val = fetch_user.unwrap();
-        if user_e.email == user.email && user_e.password == user.password {
+        
+        let parsed_hash = PasswordHash::new(&f_user_val.password).unwrap();
+        if f_user_val.password == parsed_hash.to_string(){
             HttpResponse::Ok().json(f_user_val)
         } else {
             HttpResponse::BadRequest().json("Invalid credentials passed")
@@ -98,19 +106,30 @@ pub async fn login_user(
 
 pub async fn update_user_balance(
     pool: web::Data<MySqlPool>,
-    user_id : i64,
-    new_balance: i32
+    user_id: i64,
+    new_balance: i32,
 ) -> impl Responder {
-    let update_b = sqlx::query_as!(User,"update users set balance = ? where id = ?", new_balance, user_id).execute(pool.get_ref()).await;
+    let update_b = sqlx::query_as!(
+        User,
+        "update users set balance = ? where id = ?",
+        new_balance,
+        user_id
+    )
+    .execute(pool.get_ref())
+    .await;
     match update_b {
         Ok(updated) => {
             let updated_user = updated.last_insert_id();
             let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
-            if let Ok(new_balance_)= new_balance {
+            if let Ok(new_balance_) = new_balance {
                 HttpResponse::Ok().json(new_balance_)
-            } else { HttpResponse::BadRequest().finish()}
-        },
-        Err(e) => {eprintln!("{}",e);
-        HttpResponse::BadRequest().finish()}
+            } else {
+                HttpResponse::BadRequest().finish()
+            }
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            HttpResponse::BadRequest().finish()
+        }
     }
 }
