@@ -1,12 +1,13 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
 
-use crate::models::users::{CreateUser, LoginUser, User};
+use crate::{models::users::{CreateUser, LoginUser, User}, utils::emailval::validate_email};
 
 pub async fn create_user(
     pool: web::Data<MySqlPool>,
     user: web::Json<CreateUser>,
 ) -> impl Responder {
+    validate_email(&user.email);
     let users = sqlx::query_as!(
         User,
         "insert into users(name, email, password, balance) values (?,?,?,?)",
