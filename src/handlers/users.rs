@@ -24,7 +24,7 @@ pub async fn create_user(
             let id = user.last_insert_id();
             let ret_user = sqlx::query_as!(
                 User,
-                "select name, email, password, balance from users where id = ?",
+                "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where id = ?",
                 id
             )
             .fetch_one(pool.get_ref())
@@ -45,7 +45,7 @@ pub async fn create_user(
 }
 
 pub async fn fetch_user(pool: web::Data<MySqlPool>) -> Option<User> {
-    let user = sqlx::query_as!(User, "select name, email, password, balance from users")
+    let user = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users")
         .fetch_one(pool.get_ref())
         .await;
     match user {
@@ -78,7 +78,7 @@ pub async fn login_user(
 
     let user_exists = sqlx::query_as!(
         User,
-        "select name, email, password, balance from users where email = ?",
+        "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where email = ?",
         user.email
     )
     .fetch_one(pool.get_ref())
