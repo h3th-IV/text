@@ -14,3 +14,15 @@ CREATE TABLE users (
     balance int NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users
+    ADD COLUMN all_orders JSON,
+    ADD COLUMN pending_orders JSON,
+    ADD COLUMN fufilled_orders JSON,
+    ADD COLUMN total_profit INT,
+    ADD COLUMN total_losses INT,
+    ADD COLUMN is_admin TINYINT,
+    ADD COLUMN is_approved TINYINT,
+    ADD COLUMN is_blocked TINYINT,
+    ADD COLUMN connections JSON,
+    ADD COLUMN grof_points INT;
