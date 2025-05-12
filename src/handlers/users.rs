@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
 
-use crate::{models::users::{CreateUser, LoginUser, User}, utils::emailval::validate_email};
+use crate::{models::users::{CreateUser, LoginUser, UpdateBalance, User}, utils::emailval::validate_email};
 
 pub async fn create_user(
     pool: web::Data<MySqlPool>,
@@ -93,5 +93,24 @@ pub async fn login_user(
         }
     } else {
         HttpResponse::BadRequest().json("invalid credentials passed")
+    }
+}
+
+pub async fn update_user_balance(
+    pool: web::Data<MySqlPool>,
+    user_id : i64,
+    new_balance: i32
+) -> impl Responder {
+    let update_b = sqlx::query_as!(User,"update users set balance = ? where id = ?", new_balance, user_id).execute(pool.get_ref()).await;
+    match update_b {
+        Ok(updated) => {
+            let updated_user = updated.last_insert_id();
+            let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
+            if let Ok(new_balance_)= new_balance {
+                HttpResponse::Ok().json(new_balance_)
+            } else { HttpResponse::BadRequest().finish()}
+        },
+        Err(e) => {eprintln!("{}",e);
+        HttpResponse::BadRequest().finish()}
     }
 }

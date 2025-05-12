@@ -29,3 +29,17 @@ pub struct LoginUser {
     pub email: String,
     pub password:String
 }
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct UpdateBalance {
+    pub id: i64,
+    pub balance: Option<i32>,
+}
+
+pub struct _UpdateUserStatus {
+    pub id: i64,
+    pub is_admin: Option<i8>,
+    pub is_approved: Option<i8>,
+    pub is_blocked: Option<i8>,
+    pub grof_points: Option<i32>
+}
