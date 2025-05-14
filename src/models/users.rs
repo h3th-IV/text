@@ -1,4 +1,3 @@
-use actix_web::HttpResponse;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -14,7 +13,8 @@ pub struct User {
     pub is_admin: Option<i8>,
     pub is_approved: Option<i8>,
     pub is_blocked: Option<i8>,
-    pub grof_points: Option<i32>
+    pub grof_points: Option<i32>,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

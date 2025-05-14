@@ -1,13 +1,12 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2, PasswordHash, PasswordVerifier,
+    Argon2, PasswordHash
 };
 use sqlx::MySqlPool;
 
 use crate::{
     models::users::{CreateUser, LoginUser, User},
-    utils::emailval::validate_email,
 };
 
 pub async fn create_user(
@@ -33,7 +32,7 @@ pub async fn create_user(
             let id = user.last_insert_id();
             let ret_user = sqlx::query_as!(
                 User,
-                "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where id = ?",
+                "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where id = ?",
                 id
             )
             .fetch_one(pool.get_ref())
@@ -54,7 +53,7 @@ pub async fn create_user(
 }
 
 pub async fn fetch_user(pool: web::Data<MySqlPool>, email:String) -> Option<User> {
-    let user = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where email = ?",email)
+    let user = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where email = ?",email)
         .fetch_one(pool.get_ref())
         .await;
     match user {
@@ -84,7 +83,7 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
 
     let user_exists = sqlx::query_as!(
         User,
-        "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where email = ?",
+        "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where email = ?",
         user.email
     )
     .fetch_one(pool.get_ref())
@@ -120,7 +119,7 @@ pub async fn update_user_balance(
     match update_b {
         Ok(updated) => {
             let updated_user = updated.last_insert_id();
-            let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
+            let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
             if let Ok(new_balance_) = new_balance {
                 HttpResponse::Ok().json(new_balance_)
             } else {

@@ -26,3 +26,5 @@ ALTER TABLE users
     ADD COLUMN is_blocked TINYINT,
     ADD COLUMN connections JSON,
     ADD COLUMN grof_points INT;
+
+ALTER TABLE users ADD COLUMN role;
