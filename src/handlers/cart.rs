@@ -24,6 +24,18 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
             match cart_details {
                 Ok(cart_result) => {
                     println!("{:?}", cart);
+                    /* write a functionality that would store the order or cart */
+                    /* information to a temporary file that would be sent to the */
+                    /* users .. (specific user making the order) */
+
+                    /* 
+                        when this file is created here for instance. we are going
+                        to send the user an email at this point. immediately the 
+                        email is sent. we delete the file. which means that the filename
+                        should be the {email}.txt
+
+                        the file should be created in memory without overheads ...
+                     */
                     HttpResponse::Ok().json(cart_result)
                 },
                 Err(e) => {
