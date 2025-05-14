@@ -18,11 +18,12 @@ pub async fn create_user(
     let new_password = argon2.hash_password(user.password.as_bytes(), &salt).unwrap().to_string();
     let users = sqlx::query_as!(
         User,
-        "insert into users(name, email, password, balance) values (?,?,?,?)",
+        "insert into users(name, email, password, balance, role) values (?,?,?,?,?)",
         user.name,
         user.email,
         new_password,
-        0
+        0,
+        "student"
     )
     .execute(pool.get_ref())
     .await;
