@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+use super::cart::Cart;
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: i64,
@@ -42,4 +44,12 @@ pub struct _UpdateUserStatus {
     pub is_approved: Option<i8>,
     pub is_blocked: Option<i8>,
     pub grof_points: Option<i32>
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct UserCart {
+    #[sqlx(flatten)]
+    pub user: User,
+    #[sqlx(flatten)]
+    pub cart: Option<Cart>,
 }

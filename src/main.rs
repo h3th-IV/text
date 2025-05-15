@@ -3,7 +3,11 @@ mod models;
 mod utils;
 
 use dotenvy::dotenv;
-use handlers::{cart::create_cart, items::{create_items,get_items}, users::{create_user, login_user}};
+use handlers::{
+    cart::create_cart,
+    items::{create_items, get_items},
+    users::{create_user, login_user}, users_carts::fetch_users_carts,
+};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
@@ -17,13 +21,18 @@ async fn main() -> io::Result<()> {
         .connect(&database_url)
         .await
         .expect("failed to create pool");
+    println!("brex server running @:8080");
     HttpServer::new(move || {
         App::new()
-        .app_data(web::Data::new(pool.clone()))
-        .route("/register", web::post().to(create_user))
-        .route("/login", web::post().to(login_user))
-        .route("/create-item", web::post().to(create_items))
-        .route("/", web::get().to(get_items))
-        .route("/add-cart", web::post().to(create_cart))
-    }).bind(("127.0.0.1", 8080))?.run().await
+            .app_data(web::Data::new(pool.clone()))
+            .route("/register", web::post().to(create_user))
+            .route("/login", web::post().to(login_user))
+            .route("/create-item", web::post().to(create_items))
+            .route("/", web::get().to(get_items))
+            .route("/add-cart", web::post().to(create_cart))
+            .route("/users-carts", web::get().to(fetch_users_carts))
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
