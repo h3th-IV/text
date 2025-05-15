@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
 use crate::models::users::{User, UserCart};
 use crate::models::cart::Cart;
+use crate::utils::checkout::save_user_checkout_to_file;
 
 //temp struct with all fields from user and cart
 #[derive(sqlx::FromRow)]
@@ -96,3 +97,14 @@ pub async fn fetch_users_carts(pool: web::Data<MySqlPool>) -> impl Responder {
 }
 
 //use raw strings for query later
+
+pub async fn save_checkout(
+    pool: web::Data<MySqlPool>,
+    email: web::Path<String>,
+) -> impl Responder {
+    let result = save_user_checkout_to_file(pool.get_ref(), &email).await;
+    match result {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({"message": "Checkout saved"})),
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({"error": e.to_string()})),
+    }
+}
