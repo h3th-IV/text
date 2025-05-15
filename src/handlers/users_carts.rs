@@ -64,7 +64,7 @@ pub async fn fetch_users_carts(pool: web::Data<MySqlPool>) -> impl Responder {
                     id: raw.user_id,
                     name: raw.user_name,
                     email: raw.user_email,
-                    password: raw.user_password,
+                    password: "".to_string(),
                     balance: raw.user_balance,
                     total_profit: raw.user_total_profit,
                     total_losses: raw.user_total_losses,

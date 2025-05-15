@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse, Responder};
 use argon2::{
+    PasswordVerifier,
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash
 };
@@ -76,18 +77,22 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
     .fetch_one(pool.get_ref())
     .await;
     if let Ok(user_e) = user_exists {
-        let fetch_user = fetch_user(pool,user_e.email.clone()).await;
-        let f_user_val = match fetch_user {
-            Some(ref uc) => &uc.user,
-            None => return HttpResponse::BadRequest().json("Invalid credentials passed"),
-        };
-        
-        let parsed_hash = PasswordHash::new(&f_user_val.password).unwrap();
-        println!("{} \n\n {} ", f_user_val.password, parsed_hash);
-        if f_user_val.password == parsed_hash.to_string(){
-            HttpResponse::Ok().json(fetch_user)
-        } else {
-            HttpResponse::BadRequest().json("Invalid credentials passed")
+        let fetch_user = fetch_user(pool, user_e.email.clone()).await;
+        match fetch_user {
+            Some(mut uc) => {
+                let parsed_hash = PasswordHash::new(&uc.user.password).unwrap();
+                //used Password verifier here ti check if password is correct
+                if argon2::Argon2::default()
+                    .verify_password(user.password.as_bytes(), &parsed_hash)
+                    .is_ok()
+                {
+                    uc.user.password.clear();
+                    HttpResponse::Ok().json(uc)
+                } else {
+                    HttpResponse::BadRequest().json("Invalid credentials passed")
+                }
+            }
+            None => HttpResponse::BadRequest().json("Invalid credentials passed"),
         }
     } else {
         HttpResponse::BadRequest().json("invalid credentials passed")
@@ -193,7 +198,10 @@ pub async fn fetch_user_with_cart(pool: web::Data::<MySqlPool>, email: web::Path
     let email_: String = email.clone();
     let user_cart = fetch_user(pool, email.into_inner()).await;
     match user_cart {
-        Some(uc) => HttpResponse::Ok().json(uc),
+        Some(mut uc) => {
+            uc.user.password.clear();
+            HttpResponse::Ok().json(uc)
+        },
         None => {
             let message = format!("User with email '{}' not found", &email_);
             HttpResponse::NotFound().body(message)
