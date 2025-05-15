@@ -5,27 +5,27 @@ use crate::models::cart::Cart;
 
 //temp struct with all fields from user and cart
 #[derive(sqlx::FromRow)]
-struct RawUserCart {
+pub struct RawUserCart {
     //user fields
-    user_id: i64,
-    user_name: String,
-    user_email: String,
-    user_password: String,
-    user_balance: Option<i32>,
-    user_total_profit: Option<i32>,
-    user_total_losses: Option<i32>,
-    user_is_admin: Option<i8>,
-    user_is_approved: Option<i8>,
-    user_is_blocked: Option<i8>,
-    user_grof_points: Option<i32>,
-    user_role: String,
+    pub user_id: i64,
+    pub user_name: String,
+    pub user_email: String,
+    pub user_password: String,
+    pub user_balance: Option<i32>,
+    pub user_total_profit: Option<i32>,
+    pub user_total_losses: Option<i32>,
+    pub user_is_admin: Option<i8>,
+    pub user_is_approved: Option<i8>,
+    pub user_is_blocked: Option<i8>,
+    pub user_grof_points: Option<i32>,
+    pub user_role: String,
     //cart fields (nullable dur to left joim)
-    cart_id: Option<i64>,
-    cart_role: Option<String>,
-    cart_email: Option<String>,
-    cart_total_order_amount: Option<i64>,
-    cart_created_at: Option<time::OffsetDateTime>,
-    cart_updated_at: Option<time::OffsetDateTime>,
+    pub cart_id: Option<i64>,
+    pub cart_role: Option<String>,
+    pub cart_email: Option<String>,
+    pub cart_total_order_amount: Option<i64>,
+    pub cart_created_at: Option<time::OffsetDateTime>,
+    pub cart_updated_at: Option<time::OffsetDateTime>,
 }
 
 pub async fn fetch_users_carts(pool: web::Data<MySqlPool>) -> impl Responder {
