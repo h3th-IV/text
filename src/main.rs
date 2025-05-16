@@ -1,6 +1,7 @@
 mod handlers;
 mod models;
 mod utils;
+mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
