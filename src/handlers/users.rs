@@ -21,12 +21,14 @@ pub async fn create_user(
     let new_password = argon2.hash_password(user.password.as_bytes(), &salt).unwrap().to_string();
     let users = sqlx::query_as!(
         User,
-        "insert into users(name, email, password, balance, role) values (?,?,?,?,?)",
+        "insert into users(name, email, password, balance, role, phone_number, address) values (?,?,?,?,?,?,?)",
         user.name,
         user.email,
         new_password,
         0,
-        "student"
+        "student",
+        user.phone_number,
+        user.address
     )
     .execute(pool.get_ref())
     .await;
@@ -36,7 +38,7 @@ pub async fn create_user(
             let id = user.last_insert_id();
             let ret_user = sqlx::query_as!(
                 User,
-                "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where id = ?",
+                "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role, phone_number, address from users where id = ?",
                 id
             )
             .fetch_one(pool.get_ref())
@@ -71,7 +73,7 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
 
     let user_exists = sqlx::query_as!(
         User,
-        "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where email = ?",
+        "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role, phone_number, address from users where email = ?",
         user.email
     )
     .fetch_one(pool.get_ref())
@@ -115,7 +117,7 @@ pub async fn update_user_balance(
     match update_b {
         Ok(updated) => {
             let updated_user = updated.last_insert_id();
-            let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
+            let new_balance = sqlx::query_as!(User, "select id, name, email, password, balance,is_admin, is_approved,grof_points,total_profit, total_losses, is_blocked, role, phone_number, address from users where id = ?", updated_user).fetch_one(pool.get_ref()).await;
             if let Ok(new_balance_) = new_balance {
                 HttpResponse::Ok().json(new_balance_)
             } else {
@@ -146,6 +148,8 @@ pub async fn fetch_user(pool: web::Data<MySqlPool>, email:String) -> Option<User
             u.is_blocked as user_is_blocked, 
             u.grof_points as user_grof_points, 
             u.role as user_role,
+            u.phone_number as user_phone_number,
+            u.address as user_address,
             c.id as cart_id, 
             c.role as cart_role, 
             c.email as cart_email, 
@@ -177,6 +181,8 @@ pub async fn fetch_user(pool: web::Data<MySqlPool>, email:String) -> Option<User
                 is_blocked: raw.user_is_blocked,
                 grof_points: raw.user_grof_points,
                 role: raw.user_role,
+                phone_number: raw.user_phone_number,
+                address: raw.user_address
             },
             cart: raw.cart_id.map(|id| Cart {
                 id,

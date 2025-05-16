@@ -17,13 +17,17 @@ pub struct User {
     pub is_blocked: Option<i8>,
     pub grof_points: Option<i32>,
     pub role: String,
+    pub phone_number: String,
+    pub address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct CreateUser {
     pub name: String,
     pub password: String,
-    pub email: String
+    pub email: String,
+    pub phone_number: String,
+    pub address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

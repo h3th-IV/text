@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use sqlx::MySqlPool;
-use time::{OffsetDateTime, format_description};
+use time::{OffsetDateTime};
 
 use crate::handlers::users_carts::RawUserCart;
 
@@ -49,8 +49,7 @@ pub async fn save_user_checkout_to_file(pool: &MySqlPool, email: &str) -> Result
 
     //sanitize email; 
     let sanitized_email = email.replace(['@', '.'], "_");
-    let date_str = "25-05-15";
-    
+
     //get currnt date
     let now = OffsetDateTime::now_utc();
     // let format = format_description::parse("[year repr:last_two]-[month]-[day]")?;

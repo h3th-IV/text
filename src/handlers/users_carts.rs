@@ -20,6 +20,8 @@ pub struct RawUserCart {
     pub user_is_blocked: Option<i8>,
     pub user_grof_points: Option<i32>,
     pub user_role: String,
+    pub user_phone_number: String,
+    pub user_address: String,
     //cart fields (nullable dur to left joim)
     pub cart_id: Option<i64>,
     pub cart_role: Option<String>,
@@ -45,6 +47,8 @@ pub async fn fetch_users_carts(pool: web::Data<MySqlPool>) -> impl Responder {
             u.is_blocked AS user_is_blocked, 
             u.grof_points AS user_grof_points, 
             u.role AS user_role,
+            u.phone_number as user_phone_number,
+            u.address as user_address,
             c.id AS cart_id, 
             c.role AS cart_role, 
             c.email AS cart_email, 
@@ -74,6 +78,8 @@ pub async fn fetch_users_carts(pool: web::Data<MySqlPool>) -> impl Responder {
                     is_blocked: raw.user_is_blocked,
                     grof_points: raw.user_grof_points,
                     role: raw.user_role,
+                    phone_number: raw.user_phone_number,
+                    address: raw.user_address
                 },
                 cart: match raw.cart_id {
                     Some(id) => Some(Cart {

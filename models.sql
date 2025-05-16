@@ -26,6 +26,8 @@ ALTER TABLE users
     ADD COLUMN is_blocked TINYINT,
     ADD COLUMN connections JSON,
     ADD COLUMN grof_points INT;
+    ADD COLUMN phone_number VARCHAR(255) NOT NULL,
+    ADD COLUMN address VARCHAR(255) NOT NULL
 
 ALTER TABLE users ADD COLUMN role VARCHAR(190) NOT NULL;
 
