@@ -1,7 +1,8 @@
 use std::io;
 
+use actix_web::http;
 use dotenvy::dotenv;
-use reqwest::Client;
+use reqwest::{Client, Method, Response};
 pub struct PaystackClient {
     pub client: Client,
     pub base_url: String,
@@ -19,5 +20,26 @@ impl PaystackClient {
             base_url: "https://api.paystack.co".to_string(),
             bearer_token: beare_token
         })
+    }
+
+    pub async fn make_request(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+    ) -> Result<reqwest::Response, io::Error> {
+        let url = format!("{}/{}", self.base_url.trim_end_matches('/'), path.trim_start_matches('/'));
+        let mut request = self.client.request(method, url);
+        request = request
+            .header("Authorization", format!("Bearer {}", self.bearer_token))
+            .header("Content-Type", "application/json");
+        if let Some(body) = body {
+            request = request.body(body);
+        }
+        let response = match request.send().await {
+            Ok(response) => response,
+            Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Request failed: {}", e))),
+        };
+        Ok(response)
     }
 }
