@@ -10,6 +10,7 @@ use handlers::{
     users::{create_user, fetch_user_with_cart, login_user}, 
     users_carts::{fetch_users_carts, save_checkout},
 };
+use paysterk::{charge::{create_charge, BankDetails, ChargeAuthorizationRequest, ChargeRequest}, client::PaystackClient, transaction::{charge_authorization, fetch_all_transaction, fetch_transaction, verify_transaction, VerifyTransactionRequest}};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};

@@ -1,8 +1,7 @@
 use std::io;
 
-use actix_web::http;
 use dotenvy::dotenv;
-use reqwest::{Client, Method, Response};
+use reqwest::{Client, Method};
 pub struct PaystackClient {
     pub client: Client,
     pub base_url: String,
