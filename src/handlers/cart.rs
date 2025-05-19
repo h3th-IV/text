@@ -1,7 +1,11 @@
+use std::{ffi::CString, fs::File, os::fd::FromRawFd};
+
 use actix_web::{web, HttpResponse, Responder};
+use memmap2::MmapMut;
+use serde_json::to_string;
 use sqlx::MySqlPool;
 
-use crate::models::cart::{Cart, CreateCart};
+use crate::{handlers::users::fetch_user, models::cart::{Cart, CreateCart}};
 
 pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>) -> impl Responder {
     let create_cart = sqlx::query_as!(
@@ -27,6 +31,23 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
                     /* write a functionality that would store the order or cart */
                     /* information to a temporary file that would be sent to the */
                     /* users .. (specific user making the order) */
+
+                    let convert_data = to_string(&cart_result).unwrap();
+                    println!("convert data resp : {}", convert_data);
+
+                    let user = fetch_user(pool, cart_result.email.clone()).await.unwrap();
+                    let file_path = CString::new("/tmp/".to_string() + user.name.as_str() + ".txt").unwrap();
+                    let file_desc = unsafe { libc::open(file_path.as_ptr(), libc::O_RDWR | libc::O_CREAT | libc::O_TRUNC, 0o644)};
+                    if file_desc < 0 { 
+                        eprintln!("{}", "file to open file");
+                        return HttpResponse::BadRequest().finish();
+                    }
+                    let user_file = unsafe { File::from_raw_fd(file_desc) };
+                    user_file.set_len(convert_data.len() as u64).unwrap();
+
+                    let mut file_process_kern = unsafe {MmapMut::map_mut(&user_file).unwrap()};
+                    file_process_kern[..convert_data.len()].copy_from_slice(convert_data.as_bytes());
+                    file_process_kern.flush().expect("failed to flush memory map");
 
                     /* 
                         when this file is created here for instance. we are going
