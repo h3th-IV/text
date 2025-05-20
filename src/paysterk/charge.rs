@@ -9,7 +9,7 @@ use reqwest::Method;
 #[derive(Serialize, Debug)]
 pub struct ChargeRequest {
     pub email: String,
-    pub amount: i32,
+    pub amount: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>, // Default: NGN
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,6 +51,18 @@ pub struct ChargeAuthorizationRequest {
     pub authorization_code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SubmitPinRequest {
+    pub reference: String,
+    pub pin: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SubmitOtpRequest {
+    pub reference: String,
+    pub otp: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -99,8 +111,8 @@ pub struct ChargeAuthorizationResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct ChargeAuthData {
-    pub id: u32,
-    pub amount: u16,
+    pub id: i64,
+    pub amount: i64,
     pub reference: String,
     pub domain: Option<String>,
     pub status: Option<String>,
@@ -113,10 +125,10 @@ pub struct ChargeAuthData {
     pub currency: Option<String>,
     pub ip_address: Option<String>,
     #[serde(default)]
-    pub metadata: Option<Metadata>,
+    pub metadata: Option<u32>,
     #[serde(default)]
     pub tx_log: Option<ChargeLog>,
-    pub fees: Option<u32>,
+    pub fees: Option<i64>,
     pub fees_split: Option<String>,
     #[serde(default)]
     pub authorization: Option<ChargeAuthorization>,
@@ -163,7 +175,7 @@ pub struct ChargeAuthorization {
 
 #[derive(Deserialize, Debug)]
 pub struct ChargeCustomer {
-    pub id: u32, // Guaranteed
+    pub id: u32,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub email: Option<String>,
@@ -177,8 +189,8 @@ pub struct ChargeCustomer {
 // ChargeData represents the data of a charge response.
 #[derive(Deserialize, Debug)]
 pub struct ChargeData {
-    pub id: Option<i32>,
-    pub amount: Option<i32>,
+    pub id: Option<i64>,
+    pub amount: Option<i64>,
     pub currency: Option<String>,
     pub transaction_date: Option<String>,
     pub status: Option<String>,
@@ -191,7 +203,7 @@ pub struct ChargeData {
     pub ip_address: Option<String>,
     #[serde(default)]
     pub log: Option<ChargeLog>,
-    pub fees: Option<i32>,
+    pub fees: Option<i64>,
     #[serde(default)]
     pub authorization: Option<ChargeAuthorization>,
     #[serde(default)]
@@ -230,10 +242,7 @@ pub async fn create_charge(client: &PaystackClient, req: ChargeRequest) -> Resul
     Ok(charge_tx)
 }
 
-pub async fn charge_authorization(
-    client: &PaystackClient,
-    req: ChargeAuthorizationRequest,
-) -> Result<ChargeAuthorizationResponse, io::Error> {
+pub async fn charge_authorization(client: &PaystackClient, req: ChargeAuthorizationRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
     const PATH: &str = "transaction/charge_authorization";
     let body = match serde_json::to_string(&req) {
         Ok(body) => body,
@@ -250,7 +259,7 @@ pub async fn charge_authorization(
             io::ErrorKind::Other,
             format!("Paystack API error: status {}, body: {}", status_code, body),
         ));
-    };
+    }
     let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
         Ok(resp) => resp,
         Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
@@ -264,6 +273,102 @@ pub async fn charge_authorization(
     Ok(charge_tx)
 }
 
+pub async fn submit_pin(client: &PaystackClient, req: SubmitPinRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
+    const PATH: &str = "charge/submit_pin";
+    if req.pin.len() != 4 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("PIN must be 4 digits, got {} digit", req.pin.len()),
+        ));
+    }
+    let body = match serde_json::to_string(&req) {
+        Ok(body) => body,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+    };
+    let response = client.make_request(Method::POST, PATH, Some(body)).await?;
+    let status_code = response.status().as_u16();
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+    };
+    if status_code != 200 {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Paystack API error: status {}, body: {}", status_code, body),
+        ));
+    }
+    let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
+        Ok(resp) => resp,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+    };
+    if !charge_tx.status {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Submit PIN failed: {}", charge_tx.message),
+        ));
+    }
+    Ok(charge_tx)
+}
+
+pub async fn submit_otp(client: &PaystackClient, req: SubmitOtpRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
+    const PATH: &str = "charge/submit_otp";
+    let body = match serde_json::to_string(&req) {
+        Ok(body) => body,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+    };
+    let response = client.make_request(Method::POST, PATH, Some(body)).await?;
+    let status_code = response.status().as_u16();
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+    };
+    if status_code != 200 {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Paystack API error: status {}, body: {}", status_code, body),
+        ));
+    }
+    let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
+        Ok(resp) => resp,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+    };
+    if !charge_tx.status {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Submit OTP failed: {}", charge_tx.message),
+        ));
+    }
+    Ok(charge_tx)
+}
+
+pub async fn check_pending_charge(client: &PaystackClient, reference: &str) -> Result<ChargeAuthorizationResponse, io::Error> {
+    let path = format!("charge/{}", reference.trim_start_matches('/'));
+    let response = client.make_request(Method::GET, &path, None).await?;
+    let status_code = response.status().as_u16();
+    let body = match response.text().await {
+        Ok(body) => body,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+    };
+    if status_code != 200 {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Paystack API error: status {}, body: {}", status_code, body),
+        ));
+    }
+    let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
+        Ok(resp) => resp,
+        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+    };
+    if !charge_tx.status {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Check pending charge failed: {}", charge_tx.message),
+        ));
+    }
+    Ok(charge_tx)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,16 +377,64 @@ mod tests {
     async fn test_create_charge() {
         let client = PaystackClient::new().unwrap();
         let req = ChargeRequest {
-            email: "apostle@ghrof.ai".to_string(),
-            amount: 1000,
+            email: String::from("apostle@ghrof.ai"),
+            amount: 10000,
             currency: Some("NGN".to_string()),
-            card: None,
+            card: Some(CardDetails {
+                number: "4084084084084081".to_string(),
+                cvv: "408".to_string(),
+                expiry_month: "12".to_string(),
+                expiry_year: "2025".to_string(),
+            }),
             bank: None,
-            mobile_money: None,
-            authorization: None,
             metadata: None,
+            authorization: None,
+            mobile_money: None,
         };
         let result = create_charge(&client, req).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_submit_pin() {
+        let client = PaystackClient::new().unwrap();
+        let req = SubmitPinRequest {
+            reference: "test_reference".to_string(),
+            pin: "1234".to_string(),
+        };
+        let result = submit_pin(&client, req).await;
+        assert!(result.is_err()); //xpect error with invalid reference
+    }
+
+    #[tokio::test]
+    async fn test_submit_pin_invalid_length() {
+        let client = PaystackClient::new().unwrap();
+        let req = SubmitPinRequest {
+            reference: "test_reference".to_string(),
+            pin: "123".to_string(),
+        };
+        let result = submit_pin(&client, req).await;
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert_eq!(e.to_string(), "PIN must be 4 digits, got 3 digits");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_submit_otp() {
+        let client = PaystackClient::new().unwrap();
+        let req = SubmitOtpRequest {
+            reference: "lethal_interjections".to_string(),
+            otp: "123456".to_string(),
+        };
+        let result = submit_otp(&client, req).await;
+        assert!(result.is_err()); //expect error with invalid reference
+    }
+
+    #[tokio::test]
+    async fn test_check_pending_charge() {
+        let client = PaystackClient::new().unwrap();
+        let result = check_pending_charge(&client, "thugnificient").await;
+        assert!(result.is_err()); //expect error with invalid reference
     }
 }

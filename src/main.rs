@@ -10,7 +10,7 @@ use handlers::{
     users::{create_user, fetch_user_with_cart, login_user}, 
     users_carts::{fetch_users_carts, save_checkout},
 };
-use paysterk::{charge::{create_charge, BankDetails, ChargeAuthorizationRequest, ChargeRequest}, client::PaystackClient, transaction::{charge_authorization, fetch_all_transaction, fetch_transaction, verify_transaction, VerifyTransactionRequest}};
+use paysterk::{charge::{check_pending_charge, create_charge, submit_otp, submit_pin,  CardDetails, ChargeRequest, SubmitOtpRequest, SubmitPinRequest}, client::PaystackClient, transaction::fetch_all_transaction};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
@@ -18,6 +18,16 @@ use sqlx::mysql::MySqlPoolOptions;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    //Test create charge --card dertails
+
+    //Test submit_pin
+
+    //Test submit_otp
+
+    //Test check_pending_charge
+
+    //Test fetch all transactions
+
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("database not set");
     let pool = MySqlPoolOptions::new()
