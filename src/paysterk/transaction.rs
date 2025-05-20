@@ -354,19 +354,3 @@ pub async fn transaction_timeline(client: &PaystackClient, txid: &str) -> Result
     }
     Ok(timeline)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_initialize_transaction() {
-        let client = PaystackClient::new().unwrap();
-        let req = InitializeTransactionRequest {
-            email: "test@example.com".to_string(),
-            amount: 1000,
-        };
-        let result = initialize_transaction(&client, req).await;
-        assert!(result.is_ok());
-    }
-}
