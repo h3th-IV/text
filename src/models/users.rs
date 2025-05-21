@@ -26,6 +26,28 @@ pub struct User {
     pub fufilled_orders: Option<sqlx::types::Json<Vec<String>>>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserResponse {
+    pub id: i64,
+    pub name: String,
+    pub email: String,
+    pub balance: i32,
+    pub total_profit: i32,
+    pub total_losses: i32,
+    pub is_admin: bool,
+    pub is_approved: bool,
+    pub is_blocked: bool,
+    pub grof_points: i32,
+    pub role: String,
+    pub phone_number: String,
+    pub address: String,
+    pub created_at: String,
+    pub all_orders: Option<sqlx::types::Json<Vec<String>>>,
+    pub pending_orders: Option<sqlx::types::Json<Vec<String>>>,
+    pub fufilled_orders: Option<sqlx::types::Json<Vec<String>>>,
+}
+
+
 impl User {
     pub fn new() -> Self {
         User::default()
