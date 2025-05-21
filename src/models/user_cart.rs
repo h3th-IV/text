@@ -81,7 +81,7 @@ pub struct CartUserResponse {
     pub all_orders: Option<sqlx::types::Json<Vec<String>>>,
     pub pending_orders: Option<sqlx::types::Json<Vec<String>>>,
     pub fufilled_orders: Option<sqlx::types::Json<Vec<String>>>,
-    pub cart: UCartResponse,
+    pub cart: Vec<UCartResponse>,
 }
 
 impl CartUserResponse {

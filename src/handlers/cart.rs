@@ -19,6 +19,7 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
     .execute(pool.get_ref())
     .await;
 if let Ok(_c) = create_cart {
+    println!("email for creating cart : {}", &cart.email);
     let cd = sqlx::query_as::<_, Cart>(
         "select * from cart where email = ?"
     ).bind(&cart.email).fetch_one(pool.get_ref()).await;
