@@ -10,24 +10,16 @@ use handlers::{
     users::{create_user, fetch_user_with_cart, login_user}, 
     users_carts::{fetch_users_carts, save_checkout},
 };
-use paysterk::{charge::{check_pending_charge, create_charge, submit_otp, submit_pin,  CardDetails, ChargeRequest, SubmitOtpRequest, SubmitPinRequest}, client::PaystackClient, transaction::fetch_all_transaction};
+use paysterk::{webhook::handle_paystack_events};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
 use sqlx::mysql::MySqlPoolOptions;
+use sha2::Sha512;
+use hex;
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
-    //Test create charge --card dertails
-
-    //Test submit_pin
-
-    //Test submit_otp
-
-    //Test check_pending_charge
-
-    //Test fetch all transactions
-
+async fn main() -> io::Result<()> {    
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("database not set");
     let pool = MySqlPoolOptions::new()
@@ -46,6 +38,7 @@ async fn main() -> io::Result<()> {
             .route("/users-carts", web::get().to(fetch_users_carts))
             .route("user/{email}", web::get().to(fetch_user_with_cart))
             .route("/checkout/{email}", web::get().to(save_checkout))
+            .route("/webhook", web::post().to(handle_paystack_events))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

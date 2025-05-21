@@ -11,6 +11,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "hex",
+ "hmac",
  "libc",
  "memmap2",
  "reqwest",
