@@ -6,9 +6,9 @@ use argon2::{
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::models::{
-    cart::Cart, user_cart::CartUser, users::{CreateUser, LoginUser, User}
-};
+use crate::{models::{
+    cart::Cart, user_cart::{CartUser, CartUserResponse, UCart, UCartResponse}, users::{CreateUser, LoginUser, User, UserResponse}
+}, utils::timefmt::human_readable_time};
 
 pub async fn create_user(
     pool: web::Data<MySqlPool>,
@@ -43,7 +43,28 @@ pub async fn create_user(
                 .fetch_one(pool.get_ref())
                 .await;
             if let Ok(ruser) = ret_user {
-                HttpResponse::Ok().json(ruser)
+                let  u = fetch_user(pool, ruser.email.clone()).await.unwrap();
+                let hrf = ruser.created_at.map(|d|human_readable_time(d)).unwrap();
+                let res = UserResponse {
+                    id:ruser.id,
+                    name:ruser.name,
+                    email:ruser.email,
+                    balance:u.balance.unwrap_or(0),
+                    total_profit:u.balance.unwrap_or(0),
+                    total_losses:u.total_losses.unwrap_or(0),
+                    is_admin:u.is_admin,
+                    is_approved:u.is_approved,
+                    is_blocked:u.is_blocked,
+                    grof_points:u.grof_points.unwrap_or(0),
+                    role:ruser.role,
+                    phone_number:ruser.phone_number,
+                    address:ruser.address,
+                    created_at:hrf,
+                    all_orders:u.all_orders,
+                    pending_orders:u.pending_orders,
+                    fufilled_orders:u.fufilled_orders
+                };
+                HttpResponse::Ok().json(res)
             } else {
                 let e = ret_user.err().unwrap();
                 println!("{}", e);
@@ -103,7 +124,28 @@ pub async fn login_user(
     if is_valid {
         let mut user_data = user_exists;
         user_data.password.clear(); 
-        HttpResponse::Ok().json(user_data)
+        let  u = fetch_user(pool, user_data.email.clone()).await.unwrap();
+        let hrf = user_data.created_at.map(|d|human_readable_time(d)).unwrap();
+        let res = UserResponse {
+            id:user_data.id,
+            name:user_data.name,
+            email:user_data.email,
+            balance:u.balance.unwrap_or(0),
+            total_profit:u.balance.unwrap_or(0),
+            total_losses:u.total_losses.unwrap_or(0),
+            is_admin:u.is_admin,
+            is_approved:u.is_approved,
+            is_blocked:u.is_blocked,
+            grof_points:u.grof_points.unwrap_or(0),
+            role:user_data.role,
+            phone_number:user_data.phone_number,
+            address:user_data.address,
+            created_at:hrf,
+            all_orders:u.all_orders,
+            pending_orders:u.pending_orders,
+            fufilled_orders:u.fufilled_orders
+        };
+        HttpResponse::Ok().json(res)
     } else {
         println!("{}", "passed invalid data");
         HttpResponse::Unauthorized().json("Invalid credentials")
@@ -157,14 +199,14 @@ pub struct EmailQ {
 pub async fn fetch_user(
     pool: web::Data<MySqlPool>,
     email:String,
-) -> Result<CartUser, sqlx::Error> {
+) -> Result<CartUserResponse, sqlx::Error> {
     let single_user = sqlx::query_as::<_, User>("select * from users where email = ?")
         .bind(email)
         .fetch_one(pool.get_ref())
         .await;
     if let Err(sqlx::Error::RowNotFound) = single_user {
         HttpResponse::NotFound().json("user not found");
-        return Ok(CartUser::new());
+        return Ok(CartUserResponse::new());
     }
 
     let su = single_user.unwrap();
@@ -194,7 +236,13 @@ pub async fn fetch_user(
     c.email AS cart_email, 
     c.total_order_amount AS cart_total_order_amount, 
     c.created_at AS cart_created_at, 
-    c.updated_at AS cart_updated_at
+    c.updated_at AS cart_updated_at,
+    c.products AS cart_products,
+    c.cart_paid AS cart_paid,
+    c.cart_paid_amount AS cart_paid_amount,
+    c.cart_paid_date AS cart_paid_date,
+    c.cart_delivery_date AS cart_delivery_date,
+    c.cart_modified AS cart_modified
         FROM users u
         LEFT JOIN cart c ON u.email = c.email
         "#
@@ -206,14 +254,40 @@ pub async fn fetch_user(
     if let Err(ce) = user_email_in_cart {
         println!("{}", ce);
         HttpResponse::NotFound().json("user does not have cart items");
-        return Ok(CartUser::new());
+        return Ok(CartUserResponse::new());
     }
     let ueic = user_email_in_cart.unwrap();
     if ueic.email.is_empty() {
         println!("{}", "user does not exist in cart");
-        return Ok(CartUser::new());
+        return Ok(CartUserResponse::new());
     }
-    Ok(single_user_cart)
+
+    let human_time = single_user_cart.created_at.map(|dt| human_readable_time(dt)).unwrap();
+    let c_created_at = single_user_cart.cart.created_at.map(|dt| human_readable_time(dt)).unwrap();
+    let c_updated_at = single_user_cart.cart.updated_at.map(|dt| human_readable_time(dt)).unwrap();
+    let cart_res = CartUserResponse {
+        id: single_user_cart.id,
+        name:single_user_cart.name,
+        email:single_user_cart.email,
+        password:single_user_cart.password,
+        balance:single_user_cart.balance,
+        total_profit:single_user_cart.total_profit,
+        total_losses:single_user_cart.total_losses,
+        is_admin:if single_user_cart.is_admin.is_none() { false} else {true},
+        is_approved: if single_user_cart.is_approved.is_none() { false} else { true},
+        is_blocked: if single_user_cart.is_blocked.is_none() { false} else {true},
+        grof_points:single_user_cart.grof_points,
+        role:single_user_cart.role,
+        phone_number:single_user_cart.phone_number,
+        address:single_user_cart.address,
+        created_at:human_time,
+        all_orders:single_user_cart.all_orders,
+        pending_orders:single_user_cart.pending_orders,
+        fufilled_orders:single_user_cart.fufilled_orders,
+        cart:UCartResponse{id: single_user_cart.cart.id,role:single_user_cart.cart.role,email:single_user_cart.cart.email,total_order_amount:single_user_cart.cart.total_order_amount, created_at:c_created_at, updated_at:c_updated_at}
+    };
+    println!("{:?}", cart_res);
+    Ok(cart_res)
 }
 
 pub async fn fetch_single_user(pool:web::Data<MySqlPool>, query: web::Query<EmailQ>) -> impl Responder {
