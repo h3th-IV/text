@@ -15,8 +15,6 @@ use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
 use sqlx::mysql::MySqlPoolOptions;
-use sha2::Sha512;
-use hex;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {    
