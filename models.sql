@@ -25,9 +25,7 @@ ALTER TABLE users
     ADD COLUMN is_approved TINYINT,
     ADD COLUMN is_blocked TINYINT,
     ADD COLUMN connections JSON,
-    ADD COLUMN grof_points INT;
-    ADD COLUMN phone_number VARCHAR(255) NOT NULL,
-    ADD COLUMN address VARCHAR(255) NOT NULL
+    ADD COLUMN grof_points INT,
 
 ALTER TABLE users ADD COLUMN role VARCHAR(190) NOT NULL;
 
@@ -39,3 +37,9 @@ total_order_amount BIGINT NOT NULL,
 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP on UPDATE CURRENT_TIMESTAMP
 );
+
+ALTER TABLE cart ADD COLUMN products JSON, ADD COLUMN cart_paid TINYINT, ADD COLUMN cart_paid_amount BIGINT,ADD COLUMN cart_paid_date TIMESTAMP, ADD COLUMN cart_delivery_date TIMESTAMP, ADD COLUMN cart_modified INT
+
+ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);
+ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'student';
+ALTER TABLE users ADD COLUMN address VARCHAR(190);

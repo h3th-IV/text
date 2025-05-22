@@ -7,8 +7,7 @@ use dotenvy::dotenv;
 use handlers::{
     cart::create_cart,
     items::{create_items, get_items},
-    users::{create_user, fetch_user_with_cart, login_user}, 
-    users_carts::{fetch_users_carts, save_checkout},
+    users::{create_user, fetch_single_user, fetch_user, login_user}, 
 };
 use paysterk::{webhook::handle_paystack_events};
 use std::{env, io};
@@ -33,11 +32,9 @@ async fn main() -> io::Result<()> {
             .route("/create-item", web::post().to(create_items))
             .route("/", web::get().to(get_items))
             .route("/add-cart", web::post().to(create_cart))
-            .route("/users-carts", web::get().to(fetch_users_carts))
-            .route("user/{email}", web::get().to(fetch_user_with_cart))
-            .route("/checkout/{email}", web::get().to(save_checkout))
+            .route("/user", web::get().to(fetch_single_user))
             .route("/webhook", web::post().to(handle_paystack_events))
-    })
+        })
     .bind(("127.0.0.1", 8080))?
     .run()
     .await
