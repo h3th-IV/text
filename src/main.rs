@@ -5,9 +5,9 @@ mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
-    cart::create_cart,
+    // cart::create_cart,
     items::{create_items, get_items},
-    users::{create_user, fetch_single_user, fetch_user, login_user}, 
+    // users::{create_user, fetch_single_user, fetch_user, login_user}, 
 };
 use paysterk::{webhook::handle_paystack_events};
 use std::{env, io};
@@ -27,12 +27,12 @@ async fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .route("/register", web::post().to(create_user))
-            .route("/login", web::post().to(login_user))
+            // .route("/register", web::post().to(create_user))
+            // .route("/login", web::post().to(login_user))
             .route("/create-item", web::post().to(create_items))
             .route("/", web::get().to(get_items))
-            .route("/add-cart", web::post().to(create_cart))
-            .route("/user", web::get().to(fetch_single_user))
+            // .route("/add-cart", web::post().to(create_cart))
+            // .route("/user", web::get().to(fetch_single_user))
             .route("/webhook", web::post().to(handle_paystack_events))
         })
     .bind(("127.0.0.1", 8080))?

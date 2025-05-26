@@ -29,17 +29,33 @@ ALTER TABLE users
 
 ALTER TABLE users ADD COLUMN role VARCHAR(190) NOT NULL;
 
-CREATE TABLE cart(
-id BIGINT PRIMARY KEY AUTO_INCREMENT,
-role VARCHAR(190) NOT NULL,
-email VARCHAR(190) NOT NULL,
-total_order_amount BIGINT NOT NULL,
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP on UPDATE CURRENT_TIMESTAMP
-);
-
-ALTER TABLE cart ADD COLUMN products JSON, ADD COLUMN cart_paid TINYINT, ADD COLUMN cart_paid_amount BIGINT,ADD COLUMN cart_paid_date TIMESTAMP, ADD COLUMN cart_delivery_date TIMESTAMP, ADD COLUMN cart_modified INT
-
 ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);
 ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'student';
 ALTER TABLE users ADD COLUMN address VARCHAR(190);
+
+-- Drop existing cart table
+DROP TABLE cart;
+
+-- Create new cart table
+CREATE TABLE cart (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    paid TINYINT NOT NULL DEFAULT 0, -- 0 = unpaid, 1 = paid
+    package VARCHAR(20) NOT NULL, -- family, student
+    email VARCHAR(255) NOT NULL,
+    total_order_amount BIGINT NOT NULL, -- In kobo
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Create orders table
+CREATE TABLE orders (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    cart_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'confirmed', -- confirmed, shipped, delivered
+    email VARCHAR(255) NOT NULL,
+    address VARCHAR(190) NOT NULL, -- Matches users.address
+    delivery_date DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (cart_id) REFERENCES cart(id)
+);

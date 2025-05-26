@@ -200,203 +200,118 @@ pub struct EmailQ {
     email: String,
 }
 
-pub async fn fetch_user_old(
-    pool:web::Data<MySqlPool>,
-    email:String
-)->Result<CartUserResponse, sqlx::Error>  {
-    let user = sqlx::query_as::<_, User> (
-        "select * from users where email = ?"
-    ).bind(email.clone()).fetch_one(pool.get_ref()).await.unwrap();
-
-    let carts = sqlx::query_as::<_, Cart>(
-        "select * from carts where email = ?"
-    ).bind(email.clone()).fetch_all(pool.get_ref()).await.unwrap();
-
-    let human_time = user
-            .created_at
-            .map(|dt| human_readable_time(dt))
-            .unwrap();
-
-    let cart_res = CartUserResponse {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        password: user.password,
-        balance: user.balance,
-        total_profit: user.total_profit,
-        total_losses: user.total_losses,
-        is_admin: if user.is_admin.is_none() {
-            false
-        } else {
-            true
-        },
-        is_approved: if user.is_approved.is_none() {
-            false
-        } else {
-            true
-        },
-        is_blocked: if user.is_blocked.is_none() {
-            false
-        } else {
-            true
-        },
-        grof_points: user.grof_points,
-        role: user.role,
-        phone_number: user.phone_number,
-        address: user.address,
-        created_at: human_time,
-        all_orders: user.all_orders,
-        pending_orders: user.pending_orders,
-        fufilled_orders: user.fufilled_orders,
-        cart: carts.into_iter().map(|m| {
-            UCartResponse {
-                id: Some(m.id),
-                role: Some(m.role),
-                email: Some(m.email),
-                total_order_amount: Some(m.total_order_amount),
-                created_at: "".to_string(),
-                updated_at: "".to_string(),
-            }
-        }).collect::<Vec::<UCartResponse>>()
-    };
-    Ok(cart_res)
-}
 
 pub async fn fetch_user(
     pool: web::Data<MySqlPool>,
     email: String,
 ) -> Result<CartUserResponse, sqlx::Error> {
-    let single_user = sqlx::query_as::<_, User>("select * from users where email = ?")
-        .bind(email)
+    // Fetch user
+    let single_user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = ?")
+        .bind(&email)
         .fetch_one(pool.get_ref())
         .await;
-    if let Err(sqlx::Error::RowNotFound) = single_user {
-        HttpResponse::NotFound().json("user not found");
-        return Ok(CartUserResponse::new());
-    }
 
-    let su = single_user.unwrap();
+    let su = match single_user {
+        Ok(user) => user,
+        Err(sqlx::Error::RowNotFound) => return Ok(CartUserResponse::new()),
+        Err(e) => return Err(e),
+    };
+
+    // Fetch user and cart data
     let single_user_carts = sqlx::query_as::<_, CartUser>(
         r#"
         SELECT 
             u.id,
-    u.name,
-    u.email,
-    u.password,
-    u.balance,
-    u.total_profit,
-    u.total_losses,
-    u.is_admin,
-    u.is_approved,
-    u.is_blocked,
-    u.grof_points,
-    u.phone_number,
-    u.role,
-    u.address,
-    u.created_at,
-    u.all_orders,
-    u.pending_orders,
-    u.fufilled_orders,
-    c.id AS cart_id, 
-    c.role AS cart_role, 
-    c.email AS cart_email, 
-    c.total_order_amount AS cart_total_order_amount, 
-    c.created_at AS cart_created_at, 
-    c.updated_at AS cart_updated_at,
-    c.products AS cart_products,
-    c.cart_paid AS cart_paid,
-    c.cart_paid_amount AS cart_paid_amount,
-    c.cart_paid_date AS cart_paid_date,
-    c.cart_delivery_date AS cart_delivery_date,
-    c.cart_modified AS cart_modified
+            u.name,
+            u.email,
+            u.password,
+            u.balance,
+            u.total_profit,
+            u.total_losses,
+            u.is_admin,
+            u.is_approved,
+            u.is_blocked,
+            u.grof_points,
+            u.phone_number,
+            u.role,
+            u.address,
+            u.created_at,
+            u.all_orders,
+            u.pending_orders,
+            u.fufilled_orders,
+            c.id AS cart_id, 
+            c.paid AS cart_paid, 
+            c.package AS cart_package, 
+            c.email AS cart_email, 
+            c.total_order_amount AS cart_total_order_amount, 
+            c.created_at AS cart_created_at, 
+            c.updated_at AS cart_updated_at
         FROM users u
         LEFT JOIN cart c ON u.email = c.email
         WHERE u.email = ?
         "#,
     )
-    .bind(su.email.clone())
+    .bind(&su.email)
     .fetch_all(pool.get_ref())
     .await?;
-    let user_email_in_cart = sqlx::query_as::<_, Cart>("select * from cart where email = ?")
-        .bind(su.email.clone())
-        .fetch_one(pool.get_ref())
-        .await;
-    if let Err(ce) = user_email_in_cart {
-        println!("{}", ce);
-        HttpResponse::NotFound().json("user does not have cart items");
-        return Ok(CartUserResponse::new());
-    }
-    let ueic = user_email_in_cart.unwrap();
-    if ueic.email.is_empty() {
-        println!("{}", "user does not exist in cart");
-        return Ok(CartUserResponse::new());
-    }
 
     if single_user_carts.is_empty() {
         return Ok(CartUserResponse::new());
     }
 
-    for single_user_cart in &single_user_carts {
-        let human_time = single_user_cart
-            .created_at
-            .map(|dt| human_readable_time(dt))
-            .unwrap();
-        let c_created_at = single_user_cart
+    // Build cart responses
+    let mut cart_responses = Vec::new();
+    for cart_user in &single_user_carts {
+        let c_created_at = cart_user
             .cart
             .created_at
             .map(|dt| human_readable_time(dt))
-            .unwrap();
-        let c_updated_at = single_user_cart
+            .unwrap_or_default();
+        let c_updated_at = cart_user
             .cart
             .updated_at
             .map(|dt| human_readable_time(dt))
-            .unwrap();
-        let cart_res = CartUserResponse {
-            id: single_user_cart.id,
-            name: single_user_cart.name.to_string(),
-            email: single_user_cart.email.to_string(),
-            password: single_user_cart.password.to_string(),
-            balance: single_user_cart.balance,
-            total_profit: single_user_cart.total_profit,
-            total_losses: single_user_cart.total_losses,
-            is_admin: if single_user_cart.is_admin.is_none() {
-                false
-            } else {
-                true
-            },
-            is_approved: if single_user_cart.is_approved.is_none() {
-                false
-            } else {
-                true
-            },
-            is_blocked: if single_user_cart.is_blocked.is_none() {
-                false
-            } else {
-                true
-            },
-            grof_points: single_user_cart.grof_points,
-            role: single_user_cart.role.clone(),
-            phone_number: single_user_cart.phone_number.clone(),
-            address: single_user_cart.address.clone(),
-            created_at: human_time,
-            all_orders: single_user_cart.all_orders.clone(),
-            pending_orders: single_user_cart.pending_orders.clone(),
-            fufilled_orders: single_user_cart.fufilled_orders.clone(),
-            cart:single_user_carts.into_iter().map(|m| {
-                UCartResponse {
-                    id: m.cart.id,
-                    role: m.cart.role,
-                    email: m.cart.email,
-                    total_order_amount: m.cart.total_order_amount,
-                    created_at: c_created_at.clone(),
-                    updated_at: c_updated_at.clone(),
-                }
-            }).collect::<Vec::<UCartResponse>>()
-        };
-        println!("{:?}", cart_res);
-        return Ok(cart_res);
+            .unwrap_or_default();
+
+        cart_responses.push(UCartResponse {
+            id: cart_user.cart.id,
+            paid: cart_user.cart.paid,
+            package: cart_user.cart.package.clone(),
+            email: cart_user.cart.email.clone(),
+            total_order_amount: cart_user.cart.total_order_amount,
+            created_at: c_created_at,
+            updated_at: c_updated_at,
+        });
     }
-    Ok(CartUserResponse::new())
+
+    // Build response
+    let human_time = su
+        .created_at
+        .map(|dt| human_readable_time(dt))
+        .unwrap_or_default();
+    let cart_res = CartUserResponse {
+        id: su.id,
+        name: su.name,
+        email: su.email,
+        password: su.password,
+        balance: su.balance,
+        total_profit: su.total_profit,
+        total_losses: su.total_losses,
+        is_admin: su.is_admin.unwrap_or(0) != 0,
+        is_approved: su.is_approved.unwrap_or(0) != 0,
+        is_blocked: su.is_blocked.unwrap_or(0) != 0,
+        grof_points: su.grof_points,
+        role: su.role,
+        phone_number: su.phone_number,
+        address: su.address,
+        created_at: human_time,
+        all_orders: su.all_orders,
+        pending_orders: su.pending_orders,
+        fufilled_orders: su.fufilled_orders,
+        cart: cart_responses,
+    };
+
+    Ok(cart_res)
 }
 
 pub async fn fetch_single_user(

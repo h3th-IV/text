@@ -4,40 +4,29 @@ use time::OffsetDateTime;
 
 use super::cart::Cart;
 
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default,FromRow)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, FromRow)]
 pub struct UCart {
-    #[sqlx(rename = "cart_id")]
-    pub id: Option<i64>,
-    #[sqlx(rename = "cart_role")]
-    pub role: Option<String>,
-    #[sqlx(rename = "cart_email")]
-    pub email: Option<String>,
-    #[sqlx(rename = "cart_total_order_amount")]
-    pub total_order_amount: Option<i64>,
-    #[sqlx(rename = "cart_created_at")]
+    pub id: i64,
+    pub paid: bool,
+    pub package: String,
+    pub email: String,
+    pub total_order_amount: i64,
     pub created_at: Option<OffsetDateTime>,
-    #[sqlx(rename = "cart_updated_at")]
     pub updated_at: Option<OffsetDateTime>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default,FromRow)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UCartResponse {
-    #[sqlx(rename = "cart_id")]
-    pub id: Option<i64>,
-    #[sqlx(rename = "cart_role")]
-    pub role: Option<String>,
-    #[sqlx(rename = "cart_email")]
-    pub email: Option<String>,
-    #[sqlx(rename = "cart_total_order_amount")]
-    pub total_order_amount: Option<i64>,
-    #[sqlx(rename = "cart_created_at")]
+    pub id: i64,
+    pub paid: bool,
+    pub package: String,
+    pub email: String,
+    pub total_order_amount: i64,
     pub created_at: String,
-    #[sqlx(rename = "cart_updated_at")]
     pub updated_at: String,
 }
 
-#[derive(Debug, Serialize, Deserialize,Default, FromRow)]
+#[derive(Debug, Serialize, Deserialize, Default, FromRow)]
 pub struct CartUser {
     pub id: i64,
     pub name: String,
@@ -85,7 +74,7 @@ pub struct CartUserResponse {
 }
 
 impl CartUserResponse {
-    pub fn new()->CartUserResponse {
+    pub fn new() -> CartUserResponse {
         CartUserResponse::default()
     }
 }
