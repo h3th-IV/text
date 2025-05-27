@@ -9,7 +9,7 @@ use sqlx::MySqlPool;
 use crate::{
     models::{
         cart::Cart,
-        user_cart::{CartUser, CartUserResponse, UCart, UCartResponse},
+        user_cart::{CartUser, CartUserResponse, UCartResponse},
         users::{CreateUser, LoginUser, User, UserResponse},
     },
     utils::timefmt::human_readable_time,
@@ -104,7 +104,7 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
     let user_exists = match result {
         Ok(user) => user,
         Err(_) => {
-            println!("{}", "user does not exist");
+            println!("user does not exist");
             return HttpResponse::Unauthorized().json("Invalid credentials");
         }
     };
@@ -126,11 +126,17 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
     if is_valid {
         let mut user_data = user_exists;
         user_data.password.clear();
-        let u = fetch_user(pool, user_data.email.clone()).await.unwrap();
+        let u = match fetch_user(pool, user_data.email.clone()).await {
+            Ok(user) => user,
+            Err(e) => {
+                eprintln!("Failed to fetch user: {}", e);
+                return HttpResponse::InternalServerError().json("Failed to fetch user data");
+            }
+        };
         let hrf = user_data
             .created_at
             .map(|d| human_readable_time(d))
-            .unwrap();
+            .unwrap_or_default();
         let res = UserResponse {
             id: user_data.id,
             name: user_data.name,
@@ -152,7 +158,7 @@ pub async fn login_user(pool: web::Data<MySqlPool>, user: web::Json<LoginUser>) 
         };
         HttpResponse::Ok().json(res)
     } else {
-        println!("{}", "passed invalid data");
+        println!("passed invalid data");
         HttpResponse::Unauthorized().json("Invalid credentials")
     }
 }
@@ -199,7 +205,6 @@ pub async fn _update_user_balance(
 pub struct EmailQ {
     email: String,
 }
-
 
 pub async fn fetch_user(
     pool: web::Data<MySqlPool>,
@@ -262,32 +267,32 @@ pub async fn fetch_user(
     // Build cart responses
     let mut cart_responses = Vec::new();
     for cart_user in &single_user_carts {
-        let c_created_at = cart_user
-            .cart
-            .created_at
-            .map(|dt| human_readable_time(dt))
-            .unwrap_or_default();
-        let c_updated_at = cart_user
-            .cart
-            .updated_at
-            .map(|dt| human_readable_time(dt))
-            .unwrap_or_default();
+        if cart_user.cart_id.is_some() {
+            let c_created_at = cart_user
+                .cart_created_at
+                .map(|dt| human_readable_time(dt))
+                .unwrap_or_default();
+            let c_updated_at = cart_user
+                .cart_updated_at
+                .map(|dt| human_readable_time(dt))
+                .unwrap_or_default();
 
-        cart_responses.push(UCartResponse {
-            id: cart_user.cart.id,
-            paid: cart_user.cart.paid,
-            package: cart_user.cart.package.clone(),
-            email: cart_user.cart.email.clone(),
-            total_order_amount: cart_user.cart.total_order_amount,
-            created_at: c_created_at,
-            updated_at: c_updated_at,
-        });
+            cart_responses.push(UCartResponse {
+                id: cart_user.cart_id,
+                paid: cart_user.cart_paid,
+                package: cart_user.cart_package.clone(),
+                email: cart_user.cart_email.clone(),
+                total_order_amount: cart_user.cart_total_order_amount,
+                created_at: c_created_at,
+                updated_at: c_updated_at,
+            });
+        }
     }
 
     // Build response
     let human_time = su
         .created_at
-        .map(|dt| human_readable_time(dt))
+        .map(|u| human_readable_time(u))
         .unwrap_or_default();
     let cart_res = CartUserResponse {
         id: su.id,

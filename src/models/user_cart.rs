@@ -4,24 +4,13 @@ use time::OffsetDateTime;
 
 use super::cart::Cart;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, FromRow)]
-pub struct UCart {
-    pub id: i64,
-    pub paid: bool,
-    pub package: String,
-    pub email: String,
-    pub total_order_amount: i64,
-    pub created_at: Option<OffsetDateTime>,
-    pub updated_at: Option<OffsetDateTime>,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UCartResponse {
-    pub id: i64,
-    pub paid: bool,
-    pub package: String,
-    pub email: String,
-    pub total_order_amount: i64,
+    pub id: Option<i64>,
+    pub paid: Option<bool>,
+    pub package: Option<String>,
+    pub email: Option<String>,
+    pub total_order_amount: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -46,8 +35,13 @@ pub struct CartUser {
     pub all_orders: Option<sqlx::types::Json<Vec<String>>>,
     pub pending_orders: Option<sqlx::types::Json<Vec<String>>>,
     pub fufilled_orders: Option<sqlx::types::Json<Vec<String>>>,
-    #[sqlx(flatten)]
-    pub cart: UCart,
+    pub cart_id: Option<i64>,
+    pub cart_paid: Option<bool>,
+    pub cart_package: Option<String>,
+    pub cart_email: Option<String>,
+    pub cart_total_order_amount: Option<i64>,
+    pub cart_created_at: Option<OffsetDateTime>,
+    pub cart_updated_at: Option<OffsetDateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
