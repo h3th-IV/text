@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use time::OffsetDateTime;
 
-use super::cart::Cart;
+// use super::cart::Cart;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UCartResponse {
@@ -74,7 +74,7 @@ impl CartUserResponse {
 }
 
 impl CartUser {
-    pub fn new() -> Self {
+    pub fn _new() -> Self {
         CartUser::default()
     }
 }

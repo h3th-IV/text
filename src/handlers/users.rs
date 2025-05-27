@@ -8,7 +8,6 @@ use sqlx::MySqlPool;
 
 use crate::{
     models::{
-        cart::Cart,
         user_cart::{CartUser, CartUserResponse, UCartResponse},
         users::{CreateUser, LoginUser, User, UserResponse},
     },
@@ -210,7 +209,7 @@ pub async fn fetch_user(
     pool: web::Data<MySqlPool>,
     email: String,
 ) -> Result<CartUserResponse, sqlx::Error> {
-    // Fetch user
+    //fetch user
     let single_user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = ?")
         .bind(&email)
         .fetch_one(pool.get_ref())
@@ -222,7 +221,7 @@ pub async fn fetch_user(
         Err(e) => return Err(e),
     };
 
-    // Fetch user and cart data
+    //fetch user and cart data
     let single_user_carts = sqlx::query_as::<_, CartUser>(
         r#"
         SELECT 
@@ -264,7 +263,7 @@ pub async fn fetch_user(
         return Ok(CartUserResponse::new());
     }
 
-    // Build cart responses
+    //cart responses
     let mut cart_responses = Vec::new();
     for cart_user in &single_user_carts {
         if cart_user.cart_id.is_some() {
@@ -289,7 +288,7 @@ pub async fn fetch_user(
         }
     }
 
-    // Build response
+    //construct response
     let human_time = su
         .created_at
         .map(|u| human_readable_time(u))

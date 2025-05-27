@@ -52,7 +52,7 @@ pub async fn get_items(
     }
 }
 
-pub async fn update_item(
+pub async fn _update_item(
     id: i64,
     pool: web::Data<MySqlPool>,
     item: web::Json<CreateItem>

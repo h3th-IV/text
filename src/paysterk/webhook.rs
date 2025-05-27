@@ -4,8 +4,6 @@ use serde_json::Value;
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use hex;
-use std::env;
-use std::io;
 
 //webhookEvent reps the structure of paystack event payloads
 #[derive(Deserialize, Debug)]

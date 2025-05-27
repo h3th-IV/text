@@ -1,23 +1,22 @@
 use actix_web::{web, HttpResponse, Responder};
-use serde_json::to_string;
+// use serde_json::to_string;
 use sqlx::MySqlPool;
 use time::OffsetDateTime;
 
 use crate::{
     handlers::users::fetch_user,
-    models::cart::{Cart, CreateCart, Order, UpdateCart},
+    models::cart::{Cart, CartResponse, CreateCart, Order, UpdateCart}, utils::timefmt::human_readable_time,
 };
 
 pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>) -> impl Responder {
-    // Validate package
+    //validate package
     if !["family", "student"].contains(&cart.package.as_str()) {
         return HttpResponse::BadRequest().body("Invalid package: must be 'family' or 'student'");
     }
 
-    // Validate total_order_amount
     let expected_amount = match cart.package.as_str() {
-        "family" => 1_500_000, // ₦15000 in kobo
-        "student" => 1_000_000, // ₦10000 in kobo
+        "family" => 1_500_000,
+        "student" => 1_000_000,
         _ => return HttpResponse::BadRequest().finish(),
     };
     if cart.total_order_amount != expected_amount {
@@ -27,7 +26,6 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
         ));
     }
 
-    // Insert cart
     let insert_result = sqlx::query!(
         "INSERT INTO cart (paid, package, email, total_order_amount) VALUES (0, ?, ?, ?)",
         cart.package,
@@ -42,7 +40,6 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
         return HttpResponse::BadRequest().finish();
     }
 
-    // Fetch created cart
     let cart_result = sqlx::query_as::<_, Cart>(
         "SELECT id, paid, package, email, total_order_amount, created_at, updated_at FROM cart WHERE email = ? ORDER BY created_at DESC LIMIT 1"
     )
@@ -51,13 +48,24 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
     .await;
 
     match cart_result {
-        Ok(cart) => match to_string(&cart) {
-            Ok(cart_json) => HttpResponse::Ok().body(cart_json),
-            Err(e) => {
-                eprintln!("Serialization error: {}", e);
-                HttpResponse::InternalServerError().finish()
+        Ok(cart) => {
+            let response = CartResponse {
+                id: cart.id,
+                paid: cart.paid,
+                package: cart.package,
+                email: cart.email,
+                total_order_amount: cart.total_order_amount,
+                created_at: human_readable_time(cart.created_at),
+                updated_at: human_readable_time(cart.updated_at),
+            };
+            match serde_json::to_string(&response) {
+                Ok(cart_json) => HttpResponse::Ok().body(cart_json),
+                Err(e) => {
+                    eprintln!("Serialization error: {}", e);
+                    HttpResponse::InternalServerError().finish()
+                }
             }
-        },
+        }
         Err(e) => {
             eprintln!("Fetch cart error: {}", e);
             HttpResponse::InternalServerError().finish()
@@ -65,7 +73,7 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
     }
 }
 
-pub async fn checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl Responder {
+pub async fn _checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl Responder {
     let cart_id = path.into_inner();
 
     // Fetch cart
@@ -93,7 +101,7 @@ pub async fn checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> 
         return HttpResponse::BadRequest().body("User address required");
     }
 
-    // Update cart to paid
+    //update cart to paid
     let update_result = sqlx::query!(
         "UPDATE cart SET paid = 1, updated_at = NOW() WHERE id = ?",
         cart_id
@@ -106,7 +114,7 @@ pub async fn checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> 
         return HttpResponse::InternalServerError().body("Failed to update cart");
     }
 
-    // Calculate delivery date
+    //calc delivery date
     let delivery_days = match cart.package.as_str() {
         "family" => 7,
         "student" => 3,
@@ -131,7 +139,7 @@ pub async fn checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> 
         return HttpResponse::InternalServerError().body("Failed to create order");
     }
 
-    // Fetch created order
+    //fetch created order
     let order = sqlx::query_as::<_, Order>(
         "SELECT id, cart_id, status, email, address, delivery_date, created_at, updated_at 
          FROM orders WHERE cart_id = ?"
@@ -149,7 +157,7 @@ pub async fn checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> 
     }
 }
 
-pub async fn update_cart(
+pub async fn _update_cart(
     pool: web::Data<MySqlPool>,
     path: web::Path<i64>,
     update: web::Json<UpdateCart>,
@@ -161,7 +169,7 @@ pub async fn update_cart(
         return HttpResponse::BadRequest().body("Invalid package: must be 'family' or 'student'");
     }
 
-    // Update package and total_order_amount
+    //update package and total_order_amount
     let new_amount = match update.package.as_str() {
         "family" => 1_500_000, // ₦15000
         "student" => 1_000_000, // ₦10000
@@ -199,7 +207,7 @@ pub async fn update_cart(
     }
 }
 
-pub async fn delete_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl Responder {
+pub async fn _delete_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl Responder {
     let cart_id = path.into_inner();
 
     let result = sqlx::query!("DELETE FROM cart WHERE id = ? AND paid = 0", cart_id)
@@ -227,7 +235,18 @@ pub async fn get_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl 
     .await;
 
     match cart {
-        Ok(c) => HttpResponse::Ok().json(c),
+        Ok(c) => {
+            let response = CartResponse {
+                id: c.id,
+                paid: c.paid,
+                package: c.package,
+                email: c.email,
+                total_order_amount: c.total_order_amount,
+                created_at: human_readable_time(c.created_at),
+                updated_at: human_readable_time(c.updated_at),
+            };
+            HttpResponse::Ok().json(response)
+        }
         Err(_) => HttpResponse::NotFound().body("Cart not found"),
     }
 }
