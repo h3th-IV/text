@@ -5,11 +5,11 @@ mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
-    cart::{create_cart, get_cart},
+    cart::{create_cart, get_cart, init_transaction},
     items::{create_items, get_items},
     users::{create_user, fetch_single_user, login_user},
 };
-use paysterk::{webhook::handle_paystack_events};
+use paysterk::{client, webhook::handle_paystack_events, transaction};
 use std::{env, io};
 
 use actix_web::{web, App, HttpServer};
@@ -17,6 +17,16 @@ use sqlx::mysql::MySqlPoolOptions;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    let paysterk_client = client::PaystackClient::new()?;
+    let init_req = transaction::InitializeTransactionRequest{
+        email: "samuelbonux10@gmail.com".to_string(),
+        amount: 10000,
+    };
+    match transaction::initialize_transaction(&paysterk_client, init_req).await {
+        Ok(resp) => println!("{:#?}", resp),
+        Err(e) => println!("err creating tx: {:#?}", e)
+    }
+
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("database not set");
     let pool = MySqlPoolOptions::new()
@@ -38,6 +48,7 @@ async fn main() -> io::Result<()> {
             // .route("/delete-cart/{id}", web::delete().to(delete_cart))
             .route("/user", web::get().to(fetch_single_user))
             .route("/webhook", web::post().to(handle_paystack_events))
+            .route("/init-txn/{id}", web::post().to(init_transaction))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

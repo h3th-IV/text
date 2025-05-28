@@ -1,13 +1,14 @@
 use actix_web::{web, HttpResponse, Responder};
-// use serde_json::to_string;
 use sqlx::MySqlPool;
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
 
 use crate::{
-    handlers::users::fetch_user,
-    models::cart::{Cart, CartResponse, CreateCart, Order, UpdateCart}, utils::timefmt::human_readable_time,
+    handlers::users::fetch_user, models::cart::{Cart, CartResponse, CreateCart, Order, UpdateCart}, paysterk::{client::PaystackClient, transaction::{InitializeTransactionRequest, initialize_transaction}}, utils::timefmt::human_readable_time,
 };
 
+/*  
+    Create cart, create a cart for the user with the selected package
+ */
 pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>) -> impl Responder {
     //validate package
     if !["family", "student"].contains(&cart.package.as_str()) {
@@ -73,54 +74,58 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
     }
 }
 
-pub async fn _checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl Responder {
-    let cart_id = path.into_inner();
-
+/*
+    the checkout cart function, will be triggered upon 
+    successfull payment confirmation by the webhook handler
+    It will create a new order from the confirmed cart, set the 
+    delivery date; the delivery date is based on my own...
+ */
+pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, String> {
     // Fetch cart
     let cart_result = sqlx::query_as::<_, Cart>(
         "SELECT id, paid, package, email, total_order_amount, created_at, updated_at FROM cart WHERE id = ?"
     )
     .bind(cart_id)
-    .fetch_one(pool.get_ref())
+    .fetch_one(pool)
     .await;
 
     let cart = match cart_result {
         Ok(c) if !c.paid => c,
-        Ok(_) => return HttpResponse::BadRequest().body("Cart already paid"),
-        Err(_) => return HttpResponse::NotFound().body("Cart not found"),
+        Ok(_) => return Err("Cart already paid".to_string()),
+        Err(_) => return Err("Cart not found".to_string()),
     };
 
     // Fetch user for address
-    let user_result = fetch_user(pool.clone(), cart.email.clone()).await;
+    let user_result = fetch_user(web::Data::new(pool.clone()), cart.email.clone()).await;
     let user = match user_result {
         Ok(u) => u,
-        Err(_) => return HttpResponse::BadRequest().body("User not found"),
+        Err(_) => return Err("User not found".to_string()),
     };
     let address = user.address;
     if address.is_empty() {
-        return HttpResponse::BadRequest().body("User address required");
+        return Err("User address required".to_string());
     }
 
-    //update cart to paid
+    // Update cart to paid
     let update_result = sqlx::query!(
         "UPDATE cart SET paid = 1, updated_at = NOW() WHERE id = ?",
         cart_id
     )
-    .execute(pool.get_ref())
+    .execute(pool)
     .await;
 
-    if update_result.is_err() {
-        eprintln!("Update cart error: {:?}", update_result.err());
-        return HttpResponse::InternalServerError().body("Failed to update cart");
+    if let Err(e) = update_result {
+        eprintln!("Update cart error: {:?}", e);
+        return Err("Failed to update cart".to_string());
     }
 
-    //calc delivery date
+    // Calculate delivery date
     let delivery_days = match cart.package.as_str() {
         "family" => 7,
         "student" => 3,
-        _ => return HttpResponse::InternalServerError().body("Invalid package"),
+        _ => return Err("Invalid package".to_string()),
     };
-    let delivery_date = OffsetDateTime::now_utc() + time::Duration::days(delivery_days);
+    let delivery_date = OffsetDateTime::now_utc() + Duration::days(delivery_days);
 
     // Create order
     let order_result = sqlx::query!(
@@ -131,28 +136,28 @@ pub async fn _checkout_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) ->
         address,
         delivery_date
     )
-    .execute(pool.get_ref())
+    .execute(pool)
     .await;
 
-    if order_result.is_err() {
-        eprintln!("Insert order error: {:?}", order_result.err());
-        return HttpResponse::InternalServerError().body("Failed to create order");
+    if let Err(e) = order_result {
+        eprintln!("Insert order error: {:?}", e);
+        return Err("Failed to create order".to_string());
     }
 
-    //fetch created order
+    // Fetch created order
     let order = sqlx::query_as::<_, Order>(
         "SELECT id, cart_id, status, email, address, delivery_date, created_at, updated_at 
          FROM orders WHERE cart_id = ?"
     )
     .bind(cart_id)
-    .fetch_one(pool.get_ref())
+    .fetch_one(pool)
     .await;
 
     match order {
-        Ok(o) => HttpResponse::Ok().json(o),
+        Ok(o) => Ok(serde_json::to_string(&o).unwrap_or_default()),
         Err(e) => {
             eprintln!("Fetch order error: {}", e);
-            HttpResponse::InternalServerError().finish()
+            Err("Failed to fetch order".to_string())
         }
     }
 }
@@ -248,5 +253,108 @@ pub async fn get_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl 
             HttpResponse::Ok().json(response)
         }
         Err(_) => HttpResponse::NotFound().body("Cart not found"),
+    }
+}
+
+
+/*  
+    this will trigger a new 
+ */
+pub async fn init_transaction(pool: web::Data<MySqlPool>, cart_id: web::Path<i64>) -> impl Responder {
+    let cart_id = *cart_id;
+
+    //fetch cart
+    let cart_result = sqlx::query_as::<_, Cart>(
+        "SELECT id, paid, package, email, total_order_amount, created_at, updated_at FROM cart WHERE id = ?"
+    )
+    .bind(cart_id)
+    .fetch_one(pool.get_ref())
+    .await;
+
+    let cart = match cart_result {
+        Ok(c) if !c.paid => c,
+        Ok(_) => return HttpResponse::BadRequest().body("Cart already paid"),
+        Err(_) => return HttpResponse::NotFound().body("Cart not found"),
+    };
+
+    let user_result = fetch_user(pool.clone(), cart.email.clone()).await;
+    let user = match user_result {
+        Ok(u) => u,
+        Err(_) => return HttpResponse::BadRequest().body("User not found"),
+    };
+    if user.address.is_empty() {
+        return HttpResponse::BadRequest().body("User address required");
+    }
+
+    let paystack_client = match PaystackClient::new() {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("Failed to create Paystack client: {}", e);
+            return HttpResponse::InternalServerError().body("Failed to initialize payment");
+        }
+    };
+
+    let init_req = InitializeTransactionRequest {
+        email: cart.email.clone(),
+        amount: cart.total_order_amount as u32,
+    };
+
+    match initialize_transaction(&paystack_client, init_req).await {
+        Ok(resp) => {
+            if resp.status {
+                let data = match resp.data.as_object() {
+                    Some(data) => data,
+                    None => {
+                        return HttpResponse::InternalServerError().body("Invalid Paystack response data")
+                    }
+                };
+                let authorization_url = match data.get("authorization_url").and_then(|v| v.as_str()) {
+                    Some(url) => url,
+                    None => {
+                        return HttpResponse::InternalServerError().body("Missing authorization_url")
+                    }
+                };
+                let access_code = match data.get("access_code").and_then(|v| v.as_str()) {
+                    Some(code) => code,
+                    None => {
+                        return HttpResponse::InternalServerError().body("Missing access_code")
+                    }
+                };
+                let reference = match data.get("reference").and_then(|v| v.as_str()) {
+                    Some(ref_) => ref_,
+                    None => {
+                        return HttpResponse::InternalServerError().body("Missing reference")
+                    }
+                };
+
+                //save txn
+                let insert_result = sqlx::query!(
+                    "INSERT INTO transactions (email, access_code, amount, status) VALUES (?, ?, ?, 'pending')",
+                    cart.email,
+                    access_code,
+                    cart.total_order_amount
+                )
+                .execute(pool.get_ref())
+                .await;
+
+                if let Err(e) = insert_result {
+                    eprintln!("Insert transaction error: {:?}", e);
+                    return HttpResponse::InternalServerError().body("Failed to save transaction");
+                }
+
+                HttpResponse::Ok().json(serde_json::json!({
+                    "authorization_url": authorization_url,
+                    "access_code": access_code,
+                    "reference": reference
+                }))
+            } else {
+                eprintln!("Paystack error: {}", resp.message);
+                HttpResponse::BadRequest().body(resp.message)
+            }
+        }
+        Err(e) => {
+            eprintln!("Paystack transaction error: {}", e);
+            HttpResponse::InternalServerError().body("Failed to initialize transaction")
+        }
     }
 }
