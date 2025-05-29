@@ -5,7 +5,7 @@ mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
-    cart::{create_cart, get_cart, init_transaction},
+    cart::{create_cart, get_cart, init_transaction, update_cart},
     items::{create_items, get_items},
     users::{create_user, fetch_single_user, login_user},
 };
@@ -44,7 +44,7 @@ async fn main() -> io::Result<()> {
             .route("/add-cart", web::post().to(create_cart))
             .route("/cart/{id}", web::get().to(get_cart))
             // .route("/checkout/{id}", web::post().to(checkout_cart))
-            // .route("/update-cart/{id}", web::post().to(update_cart))
+            .route("/update-cart/{id}", web::put().to(update_cart))
             // .route("/delete-cart/{id}", web::delete().to(delete_cart))
             .route("/user", web::get().to(fetch_single_user))
             .route("/webhook", web::post().to(handle_paystack_events))

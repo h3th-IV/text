@@ -186,17 +186,17 @@ pub async fn _checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String,
     .fetch_one(pool)
     .await;
 
-    // let delete_cart_result = sqlx::query!(
-    //     "DELETE FROM cart WHERE id = ?",
-    //     cart_id
-    // )
-    // .execute(pool)
-    // .await;
+    let delete_cart_result = sqlx::query!(
+        "DELETE FROM cart WHERE id = ?",
+        cart_id
+    )
+    .execute(pool)
+    .await;
 
-    // if let Err(e) = delete_cart_result {
-    //     eprintln!("Delete cart error: {:?}", e);
-    //     return Err("Failed to delete cart".to_string());
-    // }
+    if let Err(e) = delete_cart_result {
+        eprintln!("Delete cart error: {:?}", e);
+        return Err("Failed to delete cart".to_string());
+    }
 
     match order {
         Ok(o) => Ok(serde_json::to_string(&o).unwrap_or_default()),
@@ -207,7 +207,7 @@ pub async fn _checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String,
     }
 }
 
-pub async fn _update_cart(
+pub async fn update_cart(
     pool: web::Data<MySqlPool>,
     path: web::Path<i64>,
     update: web::Json<UpdateCart>,
@@ -245,7 +245,18 @@ pub async fn _update_cart(
             .await;
 
             match cart {
-                Ok(c) => HttpResponse::Ok().json(c),
+                Ok(c) =>{
+                    let response = CartResponse {
+                        id: c.id,
+                        paid: c.paid,
+                        package: c.package,
+                        email: c.email,
+                        total_order_amount: c.total_order_amount,
+                        created_at: human_readable_time(c.created_at),
+                        updated_at: human_readable_time(c.updated_at),
+                    };
+                    HttpResponse::Ok().json(response)
+                },
                 Err(_) => HttpResponse::NotFound().body("Cart not found"),
             }
         }
