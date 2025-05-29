@@ -3,7 +3,7 @@ use sqlx::MySqlPool;
 use time::{Duration, OffsetDateTime};
 
 use crate::{
-    handlers::users::fetch_user, models::cart::{Cart, CartResponse, CreateCart, Order, UpdateCart}, paysterk::{client::PaystackClient, transaction::{InitializeTransactionRequest, initialize_transaction}}, utils::timefmt::human_readable_time,
+    handlers::users::fetch_user, models::{cart::{Cart, CartResponse, CreateCart, Order, UpdateCart}, transaction::Transaction}, paysterk::{client::PaystackClient, transaction::{initialize_transaction, InitializeTransactionRequest}}, utils::timefmt::human_readable_time,
 };
 
 /*  
@@ -80,10 +80,28 @@ pub async fn create_cart(pool: web::Data<MySqlPool>, cart: web::Json<CreateCart>
     It will create a new order from the confirmed cart, set the 
     delivery date; the delivery date is based on my own...
  */
-pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, String> {
-    // Fetch cart
+pub async fn _checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String, String> {
+    //fetch txn
+    let tx_result = sqlx::query_as::<_, Transaction>(
+        "SELECT id, cart_id, email, access_code, reference, amount, status, created_at, updated_at 
+         FROM transactions WHERE reference = ?"
+    )
+    .bind(reference)
+    .fetch_one(pool)
+    .await;
+
+    let tx = match tx_result {
+        Ok(tx) if tx.status == "pending" => tx,
+        Ok(_) => return Err("Transaction already processed".to_string()),
+        Err(_) => return Err("Transaction not found".to_string()),
+    };
+
+    let cart_id = tx.cart_id;
+
+    //fetch cart
     let cart_result = sqlx::query_as::<_, Cart>(
-        "SELECT id, paid, package, email, total_order_amount, created_at, updated_at FROM cart WHERE id = ?"
+        "SELECT id, paid, package, email, total_order_amount, created_at, updated_at 
+         FROM cart WHERE id = ?"
     )
     .bind(cart_id)
     .fetch_one(pool)
@@ -95,7 +113,12 @@ pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, St
         Err(_) => return Err("Cart not found".to_string()),
     };
 
-    // Fetch user for address
+    //verify email matches
+    if cart.email != tx.email {
+        return Err("Transaction email does not match cart".to_string());
+    }
+
+    //fetch user for address
     let user_result = fetch_user(web::Data::new(pool.clone()), cart.email.clone()).await;
     let user = match user_result {
         Ok(u) => u,
@@ -106,20 +129,32 @@ pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, St
         return Err("User address required".to_string());
     }
 
-    // Update cart to paid
-    let update_result = sqlx::query!(
-        "UPDATE cart SET paid = 1, updated_at = NOW() WHERE id = ?",
+    //update transaction to success
+    let update_tx_result = sqlx::query!(
+        "UPDATE transactions SET status = 'success', updated_at = NOW() WHERE id = ?",
+        tx.id
+    )
+    .execute(pool)
+    .await;
+
+    if let Err(e) = update_tx_result {
+        eprintln!("Update transaction error: {:?}", e);
+        return Err("Failed to update transaction".to_string());
+    }
+
+    let update_cart_result = sqlx::query!(
+        "UPDATE cart SET paid = 'paid', updated_at = NOW() WHERE id = ?",
         cart_id
     )
     .execute(pool)
     .await;
 
-    if let Err(e) = update_result {
+    if let Err(e) = update_cart_result {
         eprintln!("Update cart error: {:?}", e);
         return Err("Failed to update cart".to_string());
     }
 
-    // Calculate delivery date
+    //calculate delivery date
     let delivery_days = match cart.package.as_str() {
         "family" => 7,
         "student" => 3,
@@ -127,7 +162,6 @@ pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, St
     };
     let delivery_date = OffsetDateTime::now_utc() + Duration::days(delivery_days);
 
-    // Create order
     let order_result = sqlx::query!(
         "INSERT INTO orders (cart_id, status, email, address, delivery_date, created_at, updated_at) 
          VALUES (?, 'confirmed', ?, ?, ?, NOW(), NOW())",
@@ -144,7 +178,6 @@ pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, St
         return Err("Failed to create order".to_string());
     }
 
-    // Fetch created order
     let order = sqlx::query_as::<_, Order>(
         "SELECT id, cart_id, status, email, address, delivery_date, created_at, updated_at 
          FROM orders WHERE cart_id = ?"
@@ -152,6 +185,18 @@ pub async fn _checkout_cart(pool: &MySqlPool, cart_id: i64) -> Result<String, St
     .bind(cart_id)
     .fetch_one(pool)
     .await;
+
+    let delete_cart_result = sqlx::query!(
+        "DELETE FROM cart WHERE id = ?",
+        cart_id
+    )
+    .execute(pool)
+    .await;
+
+    if let Err(e) = delete_cart_result {
+        eprintln!("Delete cart error: {:?}", e);
+        return Err("Failed to delete cart".to_string());
+    }
 
     match order {
         Ok(o) => Ok(serde_json::to_string(&o).unwrap_or_default()),
@@ -258,7 +303,10 @@ pub async fn get_cart(pool: web::Data<MySqlPool>, path: web::Path<i64>) -> impl 
 
 
 /*  
-    this will trigger a new 
+    this will trigger a new transaction for the user cart
+    a checkout url will be returned by paystack, which user can use for payment
+    the transaction is logged and will be updated via the webhook url with the tx
+    refernce
  */
 pub async fn init_transaction(pool: web::Data<MySqlPool>, cart_id: web::Path<i64>) -> impl Responder {
     let cart_id = *cart_id;
@@ -329,10 +377,12 @@ pub async fn init_transaction(pool: web::Data<MySqlPool>, cart_id: web::Path<i64
 
                 //save txn
                 let insert_result = sqlx::query!(
-                    "INSERT INTO transactions (email, access_code, amount, status) VALUES (?, ?, ?, 'pending')",
+                    "INSERT INTO transactions (email, access_code, amount, status, reference, cart_id) VALUES (?, ?, ?, 'pending', ?, ?)",
                     cart.email,
                     access_code,
-                    cart.total_order_amount
+                    cart.total_order_amount,
+                    reference,
+                    cart.id
                 )
                 .execute(pool.get_ref())
                 .await;

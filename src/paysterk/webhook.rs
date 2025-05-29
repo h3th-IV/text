@@ -1,5 +1,5 @@
 use actix_web::{web, HttpRequest, HttpResponse};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
@@ -87,7 +87,7 @@ pub async fn handle_paystack_events(req: HttpRequest, body: web::Bytes) -> HttpR
     //     }
     // };
 
-    let secret_key = "sk_test_fa16b06664111cf77ebcd2df5d58a1110ca0dfa6";
+    let secret_key = ""; //neglect this and also neglect the comment above it
 
     //get signature from header
     let signature = match req.headers().get("x-paystack-signature") {
@@ -159,4 +159,5 @@ fn is_valid_signature(request_body: &[u8], signature: &str, secret_key: &str) ->
 
     //compare signatur
     signature == expected_signature
+    //"sk_test_fa16b06664111cf77ebcd2df5d58a1110ca0dfa6"
 }
