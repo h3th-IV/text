@@ -143,7 +143,7 @@ pub async fn _checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String,
     }
 
     let update_cart_result = sqlx::query!(
-        "UPDATE cart SET paid = 'paid', updated_at = NOW() WHERE id = ?",
+        "UPDATE cart SET paid = 1, updated_at = NOW() WHERE id = ?",
         cart_id
     )
     .execute(pool)
@@ -186,17 +186,17 @@ pub async fn _checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String,
     .fetch_one(pool)
     .await;
 
-    let delete_cart_result = sqlx::query!(
-        "DELETE FROM cart WHERE id = ?",
-        cart_id
-    )
-    .execute(pool)
-    .await;
+    // let delete_cart_result = sqlx::query!(
+    //     "DELETE FROM cart WHERE id = ?",
+    //     cart_id
+    // )
+    // .execute(pool)
+    // .await;
 
-    if let Err(e) = delete_cart_result {
-        eprintln!("Delete cart error: {:?}", e);
-        return Err("Failed to delete cart".to_string());
-    }
+    // if let Err(e) = delete_cart_result {
+    //     eprintln!("Delete cart error: {:?}", e);
+    //     return Err("Failed to delete cart".to_string());
+    // }
 
     match order {
         Ok(o) => Ok(serde_json::to_string(&o).unwrap_or_default()),
