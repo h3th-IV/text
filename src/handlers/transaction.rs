@@ -1,9 +1,10 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
+use serde::Deserialize;
 use crate::{
     handlers::users::fetch_user,
     models::{cart::Cart, data::{PaginatedResponse, Pagination}, transaction::{Transaction, TxnResponse}},
-    paysterk::{client::PaystackClient, transaction::{initialize_transaction, InitializeTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
+    paysterk::{client::PaystackClient, transaction::{initialize_transaction, verify_transaction, InitializeTransactionRequest, VerifyTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
 };
 
 /*  
@@ -49,6 +50,7 @@ pub async fn init_transaction(pool: web::Data<MySqlPool>, cart_id: web::Path<i64
     let init_req = InitializeTransactionRequest {
         email: cart.email.clone(),
         amount: cart.total_order_amount as u32,
+        callback_url: Some("".to_string()), //will setup a call back ulr 
     };
 
     match initialize_transaction(&paystack_client, init_req).await {
@@ -197,3 +199,29 @@ pub async fn get_transaction_by_reference(pool: web::Data<MySqlPool>, reference:
         Err(_) => HttpResponse::NotFound().body("Transaction not found"),
     }
 }
+
+
+#[derive(Debug, Deserialize)]
+pub struct CallbackQuery {
+    pub reference: String,
+}
+
+// pub async fn  paystack_callback(pool: web::Data<MySqlPool>, query: web::Query<CallbackQuery>) -> impl Responder {
+//     let paystack_client = match PaystackClient::new() {
+//         Ok(client) => client,
+//         Err(e) => {
+//             eprintln!("Failed to create Paystack client: {}", e);
+//             return HttpResponse::InternalServerError().body("Failed to verify payment");
+//         }
+//     };
+
+//     let verif_req = VerifyTransactionRequest{
+//         reference: query.reference
+//     };
+    
+//     //check if tx been processed by webhook
+
+//     //if not verify tx for success
+
+//     //return success to client
+// }

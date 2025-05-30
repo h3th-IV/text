@@ -158,6 +158,7 @@ pub async fn checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String, 
     };
     let delivery_date = OffsetDateTime::now_utc() + Duration::days(delivery_days);
 
+    //create the order
     let order_result = sqlx::query!(
         "INSERT INTO orders (cart_id, status, email, address, delivery_date, created_at, updated_at) 
          VALUES (?, 'confirmed', ?, ?, ?, NOW(), NOW())",
@@ -182,6 +183,11 @@ pub async fn checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String, 
     .fetch_one(pool)
     .await;
 
+    /*
+        generate file with order details and mail to user 
+    */
+
+    //dlete the cart upon transformation to order
     let delete_cart_result = sqlx::query!(
         "DELETE FROM cart WHERE id = ?",
         cart_id

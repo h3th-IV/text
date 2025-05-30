@@ -23,6 +23,7 @@ async fn main() -> io::Result<()> {
     let init_req = transaction::InitializeTransactionRequest{
         email: "samuelbonux10@gmail.com".to_string(),
         amount: 10000,
+        callback_url: Some("".to_string()),
     };
     match transaction::initialize_transaction(&paysterk_client, init_req).await {
         Ok(resp) => println!("{:#?}", resp),

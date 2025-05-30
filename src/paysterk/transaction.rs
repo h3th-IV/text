@@ -10,6 +10,7 @@ use reqwest::Method;
 pub struct InitializeTransactionRequest {
     pub email: String,
     pub amount: u32,
+    pub callback_url: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
