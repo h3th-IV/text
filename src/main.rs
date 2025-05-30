@@ -5,9 +5,10 @@ mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
-    cart::{create_cart, get_cart, init_transaction, update_cart, mark_order_shipped, mark_delivered},
+    cart::{create_cart, get_all_carts, get_cart, init_transaction, update_cart},
     items::{create_items, get_items},
     users::{create_user, fetch_single_user, login_user},
+    order::{get_all_orders, mark_delivered, mark_order_shipped},
 };
 use paysterk::{client, webhook::handle_paystack_events, transaction};
 use std::{env, io};
@@ -50,6 +51,8 @@ async fn main() -> io::Result<()> {
             .route("/init-txn/{id}", web::post().to(init_transaction))
             .route("/{id}/shipped", web::put().to(mark_order_shipped))
             .route("/{id}/delivered", web::put().to(mark_delivered))
+            .route("/carts", web::get().to(get_all_carts))
+            .route("/orders", web::get().to(get_all_orders))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
