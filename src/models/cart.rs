@@ -55,9 +55,9 @@ pub struct Order {
     pub status: String, //"confirmed", "shipped", "delivered"
     pub email: String,
     pub address: String, //user delivery address
-    pub delivery_date: Option<OffsetDateTime>,
-    pub created_at: Option<OffsetDateTime>,
-    pub updated_at: Option<OffsetDateTime>,
+    pub delivery_date: OffsetDateTime,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,6 +67,18 @@ pub struct CartResponse {
     pub package: String,
     pub email: String,
     pub total_order_amount: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
+pub struct OrderResponse {
+    pub id: i64,
+    pub cart_id: i64, //references cart.id
+    pub status: String, //"confirmed", "shipped", "delivered"
+    pub email: String,
+    pub address: String, //user delivery address
+    pub delivery_date: String,
     pub created_at: String,
     pub updated_at: String,
 }
