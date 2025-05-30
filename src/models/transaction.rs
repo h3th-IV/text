@@ -14,3 +14,16 @@ pub struct Transaction{
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
+
+#[derive(Debug, Serialize)]
+pub struct TxnResponse{
+    pub id: i64,
+    pub cart_id: i64,
+    pub email: String,
+    pub access_code: String,
+    pub reference: String,
+    pub amount: i64,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}

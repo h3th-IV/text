@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 pub struct Order {
     pub id: i64,
     pub cart_id: i64, //references cart.id
-    pub status: String, //"confirmed", "shipped", "delivered"
+    pub status: String, //"confirmed", "shipped", "delivered", "cancelled"
     pub email: String,
     pub address: String, //user delivery address
     pub delivery_date: OffsetDateTime,
@@ -18,7 +18,7 @@ pub struct Order {
 pub struct OrderResponse {
     pub id: i64,
     pub cart_id: i64, //references cart.id
-    pub status: String, //"confirmed", "shipped", "delivered"
+    pub status: String, //"confirmed", "shipped", "delivered", ""cancelled""
     pub email: String,
     pub address: String, //user delivery address
     pub delivery_date: String,

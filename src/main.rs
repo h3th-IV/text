@@ -5,10 +5,11 @@ mod paysterk;
 
 use dotenvy::dotenv;
 use handlers::{
-    cart::{create_cart, get_all_carts, get_cart, init_transaction, update_cart},
-    items::{create_items, get_items},
+    cart::{create_cart, get_all_carts, get_cart, get_user_carts, update_cart}, 
+    items::{create_items, get_items}, 
+    order::{get_all_orders, mark_delivered, mark_order_shipped, get_order_by_id, get_user_orders, cancel_order}, 
     users::{create_user, fetch_single_user, login_user},
-    order::{get_all_orders, mark_delivered, mark_order_shipped},
+    transaction::{init_transaction, get_all_transactions, get_transaction_by_reference}
 };
 use paysterk::{client, webhook::handle_paystack_events, transaction};
 use std::{env, io};
@@ -53,6 +54,12 @@ async fn main() -> io::Result<()> {
             .route("/{id}/delivered", web::put().to(mark_delivered))
             .route("/carts", web::get().to(get_all_carts))
             .route("/orders", web::get().to(get_all_orders))
+            .route("/user/{email}/cart", web::get().to(get_user_carts))
+            .route("/{id}/order", web::get().to(get_order_by_id))
+            .route("/user/{email}/order", web::get().to(get_user_orders))
+            .route("/{id}/cancel/order", web::post().to(cancel_order))
+            .route("/txns", web::get().to(get_all_transactions))
+            .route("/txn/{reference}", web::get().to(get_transaction_by_reference))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

@@ -6,7 +6,7 @@ use sha2::Sha512;
 use hex;
 use sqlx::MySqlPool;
 
-use crate::handlers::cart::_checkout_cart;
+use crate::handlers::cart::checkout_cart;
 
 //webhookEvent reps the structure of paystack event payloads
 #[derive(Deserialize, Debug)]
@@ -160,7 +160,7 @@ pub async fn handle_paystack_events(req: HttpRequest, body: web::Bytes, pool: we
             }
 
             //checkout cart
-            match _checkout_cart(pool.get_ref(), &tx_event.data.reference).await {
+            match checkout_cart(pool.get_ref(), &tx_event.data.reference).await {
                 Ok(order_json) => {
                     println!("Checkout successful for reference {}: {}", tx_event.data.reference, order_json);
                 }
