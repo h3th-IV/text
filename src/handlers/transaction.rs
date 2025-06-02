@@ -50,7 +50,7 @@ pub async fn init_transaction(pool: web::Data<MySqlPool>, cart_id: web::Path<i64
     let init_req = InitializeTransactionRequest {
         email: cart.email.clone(),
         amount: cart.total_order_amount as u32,
-        callback_url: Some("".to_string()), //will setup a call back ulr 
+        callback_url: Some("thugnihost.lit/paystack-callback".to_string()), //will setup a call back ulr 
     };
 
     match initialize_transaction(&paystack_client, init_req).await {
