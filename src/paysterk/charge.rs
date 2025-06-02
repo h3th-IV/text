@@ -211,17 +211,31 @@ pub struct ChargeData {
     pub plan: Option<Value>,
 }
 
-pub async fn create_charge(client: &PaystackClient, req: ChargeRequest) -> Result<ChargeResponse, io::Error> {
+pub async fn create_charge(
+    client: &PaystackClient,
+    req: ChargeRequest,
+) -> Result<ChargeResponse, io::Error> {
     const PATH: &str = "charge";
     let body = match serde_json::to_string(&req) {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Serialization failed: {}", e),
+            ))
+        }
     };
     let response = client.make_request(Method::POST, PATH, Some(body)).await?;
+    let s = 34;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to read response: {}", e),
+            ))
+        }
     };
     if status_code != 200 {
         return Err(io::Error::new(
@@ -231,7 +245,12 @@ pub async fn create_charge(client: &PaystackClient, req: ChargeRequest) -> Resul
     }
     let charge_tx = match serde_json::from_str::<ChargeResponse>(&body) {
         Ok(resp) => resp,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Deserialization failed: {} (body: {})", e, body),
+            ))
+        }
     };
     if !charge_tx.status {
         return Err(io::Error::new(
@@ -242,17 +261,30 @@ pub async fn create_charge(client: &PaystackClient, req: ChargeRequest) -> Resul
     Ok(charge_tx)
 }
 
-pub async fn charge_authorization(client: &PaystackClient, req: ChargeAuthorizationRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
+pub async fn charge_authorization(
+    client: &PaystackClient,
+    req: ChargeAuthorizationRequest,
+) -> Result<ChargeAuthorizationResponse, io::Error> {
     const PATH: &str = "transaction/charge_authorization";
     let body = match serde_json::to_string(&req) {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Serialization failed: {}", e),
+            ))
+        }
     };
     let response = client.make_request(Method::POST, PATH, Some(body)).await?;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to read response: {}", e),
+            ))
+        }
     };
     if status_code != 200 {
         return Err(io::Error::new(
@@ -262,7 +294,12 @@ pub async fn charge_authorization(client: &PaystackClient, req: ChargeAuthorizat
     }
     let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
         Ok(resp) => resp,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Deserialization failed: {} (body: {})", e, body),
+            ))
+        }
     };
     if !charge_tx.status {
         return Err(io::Error::new(
@@ -273,7 +310,10 @@ pub async fn charge_authorization(client: &PaystackClient, req: ChargeAuthorizat
     Ok(charge_tx)
 }
 
-pub async fn submit_pin(client: &PaystackClient, req: SubmitPinRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
+pub async fn submit_pin(
+    client: &PaystackClient,
+    req: SubmitPinRequest,
+) -> Result<ChargeAuthorizationResponse, io::Error> {
     const PATH: &str = "charge/submit_pin";
     if req.pin.len() != 4 {
         return Err(io::Error::new(
@@ -283,13 +323,23 @@ pub async fn submit_pin(client: &PaystackClient, req: SubmitPinRequest) -> Resul
     }
     let body = match serde_json::to_string(&req) {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Serialization failed: {}", e),
+            ))
+        }
     };
     let response = client.make_request(Method::POST, PATH, Some(body)).await?;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to read response: {}", e),
+            ))
+        }
     };
     if status_code != 200 {
         return Err(io::Error::new(
@@ -299,7 +349,12 @@ pub async fn submit_pin(client: &PaystackClient, req: SubmitPinRequest) -> Resul
     }
     let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
         Ok(resp) => resp,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Deserialization failed: {} (body: {})", e, body),
+            ))
+        }
     };
     if !charge_tx.status {
         return Err(io::Error::new(
@@ -310,17 +365,30 @@ pub async fn submit_pin(client: &PaystackClient, req: SubmitPinRequest) -> Resul
     Ok(charge_tx)
 }
 
-pub async fn submit_otp(client: &PaystackClient, req: SubmitOtpRequest) -> Result<ChargeAuthorizationResponse, io::Error> {
+pub async fn submit_otp(
+    client: &PaystackClient,
+    req: SubmitOtpRequest,
+) -> Result<ChargeAuthorizationResponse, io::Error> {
     const PATH: &str = "charge/submit_otp";
     let body = match serde_json::to_string(&req) {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Serialization failed: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Serialization failed: {}", e),
+            ))
+        }
     };
     let response = client.make_request(Method::POST, PATH, Some(body)).await?;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to read response: {}", e),
+            ))
+        }
     };
     if status_code != 200 {
         return Err(io::Error::new(
@@ -330,7 +398,12 @@ pub async fn submit_otp(client: &PaystackClient, req: SubmitOtpRequest) -> Resul
     }
     let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
         Ok(resp) => resp,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Deserialization failed: {} (body: {})", e, body),
+            ))
+        }
     };
     if !charge_tx.status {
         return Err(io::Error::new(
@@ -341,13 +414,21 @@ pub async fn submit_otp(client: &PaystackClient, req: SubmitOtpRequest) -> Resul
     Ok(charge_tx)
 }
 
-pub async fn check_pending_charge(client: &PaystackClient, reference: &str) -> Result<ChargeAuthorizationResponse, io::Error> {
+pub async fn check_pending_charge(
+    client: &PaystackClient,
+    reference: &str,
+) -> Result<ChargeAuthorizationResponse, io::Error> {
     let path = format!("charge/{}", reference.trim_start_matches('/'));
     let response = client.make_request(Method::GET, &path, None).await?;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to read response: {}", e))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to read response: {}", e),
+            ))
+        }
     };
     if status_code != 200 {
         return Err(io::Error::new(
@@ -357,7 +438,12 @@ pub async fn check_pending_charge(client: &PaystackClient, reference: &str) -> R
     }
     let charge_tx = match serde_json::from_str::<ChargeAuthorizationResponse>(&body) {
         Ok(resp) => resp,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::Other, format!("Deserialization failed: {} (body: {})", e, body))),
+        Err(e) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Deserialization failed: {} (body: {})", e, body),
+            ))
+        }
     };
     if !charge_tx.status {
         return Err(io::Error::new(

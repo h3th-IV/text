@@ -2,9 +2,9 @@ use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
 use serde::Deserialize;
 use crate::{
-    handlers::users::fetch_user,
+    handlers::{cart::checkout_cart, users::fetch_user},
     models::{cart::Cart, data::{PaginatedResponse, Pagination}, transaction::{Transaction, TxnResponse}},
-    paysterk::{client::PaystackClient, transaction::{initialize_transaction, verify_transaction, InitializeTransactionRequest, VerifyTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
+    paysterk::{client::{self, PaystackClient}, transaction::{initialize_transaction, verify_transaction, InitializeTransactionRequest, VerifyTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
 };
 
 /*  
@@ -201,27 +201,48 @@ pub async fn get_transaction_by_reference(pool: web::Data<MySqlPool>, reference:
 }
 
 
-#[derive(Debug, Deserialize)]
-pub struct CallbackQuery {
-    pub reference: String,
+pub async  fn paystack_callback(pool: web::Data<MySqlPool>, reference: web::Path<String>) -> impl Responder{
+    println!("Threader !!!!!!!!!");
+    let reference = reference.into_inner();
+
+    let paystack_client = match PaystackClient::new() {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("Failed to create Paystack client: {}", e);
+            return HttpResponse::InternalServerError().body("Failed to initialize client");
+        }
+    };
+
+    let verify_req = VerifyTransactionRequest{
+        reference: reference.clone(),
+    };
+
+    match verify_transaction(&paystack_client, verify_req).await {
+        Ok(resp) if resp.status && resp.data.status.as_deref() == Some("success") => {
+            match checkout_cart(pool.get_ref(), &reference).await {
+                Ok(order_json) => {
+                    println!("Checkout successful for reference {}: {}", reference, order_json);
+                    HttpResponse::Found()
+                        .append_header(("Location", "/payment/success"))
+                        .body("Payment successful, order created")
+                }
+                Err(e) => {
+                    eprintln!("Checkout error for reference {}: {}", reference, e);
+                    HttpResponse::InternalServerError().body("Failed to process order")
+                }
+            }
+        }
+        Ok(resp) => {
+            eprintln!("Payment verification failed: {}", resp.message);
+            HttpResponse::BadRequest().body("Payment verification failed")
+        }
+        Err(e) => {
+            eprintln!("Paystack verification error: {}", e);
+            HttpResponse::InternalServerError().body("Failed to verify payment")
+        }
+    }
 }
 
-// pub async fn  paystack_callback(pool: web::Data<MySqlPool>, query: web::Query<CallbackQuery>) -> impl Responder {
-//     let paystack_client = match PaystackClient::new() {
-//         Ok(client) => client,
-//         Err(e) => {
-//             eprintln!("Failed to create Paystack client: {}", e);
-//             return HttpResponse::InternalServerError().body("Failed to verify payment");
-//         }
-//     };
-
-//     let verif_req = VerifyTransactionRequest{
-//         reference: query.reference
-//     };
-    
-//     //check if tx been processed by webhook
-
-//     //if not verify tx for success
-
-//     //return success to client
-// }
+pub async fn payment_success() -> impl Responder {
+    HttpResponse::Ok().json("Payment was successful! Your order has been placed.")
+}

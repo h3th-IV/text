@@ -10,6 +10,7 @@ use reqwest::Method;
 pub struct InitializeTransactionRequest {
     pub email: String,
     pub amount: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub callback_url: Option<String>,
 }
 
