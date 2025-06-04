@@ -109,7 +109,7 @@ pub async fn handle_paystack_events(req: HttpRequest, body: web::Bytes, pool: we
     //     }
     // };
 
-    let secret_key = "sk_test_fa16b06664111cf77ebcd2df5d58a1110ca0dfa6"; //neglect this and also neglect the comment above it
+    // let secret_key = "sk_test_fa16b06664111cf77ebcd2df5d58a1110ca0dfa6"; //neglect this and also neglect the comment above it
 
     //get signature from header
     // let signature = match req.headers().get("x-paystack-signature") {
@@ -136,7 +136,6 @@ pub async fn handle_paystack_events(req: HttpRequest, body: web::Bytes, pool: we
     };
 
     println!("{:#?}", event);
-
     //we'll only process only charge.success
     if event.event == "charge.success" {
 

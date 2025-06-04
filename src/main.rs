@@ -19,16 +19,16 @@ use sqlx::mysql::MySqlPoolOptions;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let paysterk_client = client::PaystackClient::new()?;
-    let init_req = transaction::InitializeTransactionRequest{
-        email: "samuelbonux10@gmail.com".to_string(),
-        amount: 10000,
-        callback_url: Some("".to_string()),
-    };
-    match transaction::initialize_transaction(&paysterk_client, init_req).await {
-        Ok(resp) => println!("{:#?}", resp),
-        Err(e) => println!("err creating tx: {:#?}", e)
-    }
+    // let paysterk_client = client::PaystackClient::new()?;
+    // let init_req = transaction::InitializeTransactionRequest{
+    //     email: "samuelbonux10@gmail.com".to_string(),
+    //     amount: 10000,
+    //     callback_url: Some("".to_string()),
+    // };
+    // match transaction::initialize_transaction(&paysterk_client, init_req).await {
+    //     Ok(resp) => println!("{:#?}", resp),
+    //     Err(e) => println!("err creating tx: {:#?}", e)
+    // }
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("database not set");
@@ -68,3 +68,4 @@ async fn main() -> io::Result<()> {
     .run()
     .await
 }
+

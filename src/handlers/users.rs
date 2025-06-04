@@ -331,3 +331,17 @@ pub async fn fetch_single_user(
     }
     HttpResponse::Ok().json(user)
 }
+
+
+pub async fn get_user(pool: &MySqlPool, email: String) -> Result<User, sqlx::Error> {
+    let single_user = sqlx::query_as::<_, User>("select * from user where email = ?")
+    .bind(&email)
+    .fetch_one(pool)
+    .await;
+
+    let user = match single_user {
+        Ok(usr) => usr,
+        Err(e) => return Err(e)
+    };
+    Ok(user)
+}

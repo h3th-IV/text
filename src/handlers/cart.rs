@@ -1,9 +1,13 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
 use time::{Duration, OffsetDateTime};
+use std::io::Write;
+use std::fs::File;
+// use std::{fs::File, io::{Result, Write}};
 
 use crate::{
-    handlers::users::fetch_user, models::{order::Order, {cart::{Cart, CartResponse, CreateCart, UpdateCart}}, transaction::Transaction, data::*}, utils::timefmt::{human_readable_time},
+    handlers::users::{fetch_user, get_user}, models::{cart::{Cart, CartResponse, CreateCart, UpdateCart}, data::*, order::Order, transaction::Transaction}, utils::timefmt::human_readable_time,
+    models::users::User,
 };
 
 /*  
@@ -183,9 +187,41 @@ pub async fn checkout_cart(pool: &MySqlPool, reference: &str) -> Result<String, 
     .fetch_one(pool)
     .await;
 
+    let fetched_order = match order{
+        Ok(ref ord) => ord,
+        Err(e) => {
+            let err = format!("Error fetching order: {}", e);
+            return Err(err)
+        },
+    };
+
     /*
         generate file with order details and mail to user 
     */
+    let single_user = sqlx::query_as::<_, User>("select * from users where email = ?")
+    .bind(&cart.email)
+    .fetch_one(pool)
+    .await;
+
+    let mut file_binary = Vec::new();
+    writeln!(file_binary, "Order Details").unwrap();
+    writeln!(file_binary, "-------------").unwrap();
+    writeln!(file_binary, "Order ID: {}", fetched_order.id).unwrap();
+    writeln!(file_binary, "Cart ID: {}", cart_id).unwrap();
+    writeln!(file_binary, "Email: {}", cart.email).unwrap();
+    writeln!(file_binary, "Address: {}", address).unwrap();
+    writeln!(file_binary, "Package: {}", cart.package).unwrap();
+    writeln!(file_binary, "Total Amount: {}", cart.total_order_amount).unwrap();
+    writeln!(file_binary, "Delivery Date: {}", delivery_date.format(&time::format_description::parse("[year]-[month]-[day]").unwrap()).unwrap()).unwrap();
+    writeln!(file_binary, "Status: {}", order.as_ref().map(|o| o.status.as_str()).unwrap_or("confirmed")).unwrap();
+    writeln!(file_binary, "Created At: {}", order.as_ref().map(|o| o.created_at.format(&time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap()).unwrap()).unwrap_or_default()).unwrap();
+
+    /*
+        we'll attach the file binary to the email here
+        we'll need to add something like package details later
+        - it will lsit the itmes contained in each package
+     */
+
 
     //dlete the cart upon transformation to order
     let delete_cart_result = sqlx::query!(

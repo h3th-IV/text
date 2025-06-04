@@ -1,10 +1,10 @@
 use actix_web::{web, HttpResponse, Responder};
 use sqlx::MySqlPool;
-use serde::Deserialize;
+use serde_json::json;
 use crate::{
     handlers::{cart::checkout_cart, users::fetch_user},
     models::{cart::Cart, data::{PaginatedResponse, Pagination}, transaction::{Transaction, TxnResponse}},
-    paysterk::{client::{self, PaystackClient}, transaction::{initialize_transaction, verify_transaction, InitializeTransactionRequest, VerifyTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
+    paysterk::{client::{PaystackClient}, transaction::{initialize_transaction, verify_transaction, InitializeTransactionRequest, VerifyTransactionRequest}}, utils::timefmt::conver_off_set_date_to_date,
 };
 
 /*  
@@ -202,7 +202,6 @@ pub async fn get_transaction_by_reference(pool: web::Data<MySqlPool>, reference:
 
 
 pub async  fn paystack_callback(pool: web::Data<MySqlPool>, reference: web::Path<String>) -> impl Responder{
-    println!("Threader !!!!!!!!!");
     let reference = reference.into_inner();
 
     let paystack_client = match PaystackClient::new() {
@@ -219,22 +218,52 @@ pub async  fn paystack_callback(pool: web::Data<MySqlPool>, reference: web::Path
 
     match verify_transaction(&paystack_client, verify_req).await {
         Ok(resp) if resp.status && resp.data.status.as_deref() == Some("success") => {
+        println!("verification response: {:#?}",resp);
             match checkout_cart(pool.get_ref(), &reference).await {
                 Ok(order_json) => {
-                    println!("Checkout successful for reference {}: {}", reference, order_json);
+                    println!("order was processed{:#?}", order_json);
                     HttpResponse::Found()
                         .append_header(("Location", "/payment/success"))
-                        .body("Payment successful, order created")
+                        .json(json!({
+                            "message": "Payment successful! Your order has been created. Check your email for order details."
+                        }))
                 }
-                Err(e) => {
+                Err(e) if e == "Transaction already processed" => {
                     eprintln!("Checkout error for reference {}: {}", reference, e);
-                    HttpResponse::InternalServerError().body("Failed to process order")
+                    HttpResponse::AlreadyReported().json(json!({
+                        "message": "Your order has already been processed"
+                    }))
+                }
+                Err(_) => {
+                    HttpResponse::InternalServerError().json(json!({
+                        "error": "Payment was successful, but we couldn't process your order. Please contact support."
+                    }))
                 }
             }
         }
+        Ok(resp) if resp.status && resp.data.status.as_deref() == Some("abandoned") => {
+            println!("Payment Abandoned by user: {:#?}",resp);
+            HttpResponse::PaymentRequired().json(json!({
+                "error": "Payment was not completed. Please return to the payment page to finalize your order."
+            }))
+        }
+        Ok(resp) if resp.status && resp.data.status.as_deref() == Some("failed") => {
+            println!("Payment failed: {:#?}",resp);
+            HttpResponse::PaymentRequired().json(json!({
+                "error": "Payment failed. Please check your payment details or try a different payment method."
+            }))
+        }
+        Ok(resp) if resp.status && resp.data.status.as_deref() == Some("ongoing") => {
+            println!("Payment failed: {:#?}",resp);
+            HttpResponse::Accepted().json(json!({
+                "message": "Your payment is being processed. You'll receive a confirmation soon."
+            }))
+        }
         Ok(resp) => {
-            eprintln!("Payment verification failed: {}", resp.message);
-            HttpResponse::BadRequest().body("Payment verification failed")
+            println!("Unexpected Paystack response: {:#?}", resp);
+            HttpResponse::InternalServerError().json(json!({
+                "error": "Unexpected payment status. Please try again or contact support."
+            }))
         }
         Err(e) => {
             eprintln!("Paystack verification error: {}", e);
@@ -244,5 +273,7 @@ pub async  fn paystack_callback(pool: web::Data<MySqlPool>, reference: web::Path
 }
 
 pub async fn payment_success() -> impl Responder {
-    HttpResponse::Ok().json("Payment was successful! Your order has been placed.")
+    HttpResponse::Ok().json(json!({
+        "message": "Payment successful! Your order has been created. Check your email for order details."
+    }))
 }

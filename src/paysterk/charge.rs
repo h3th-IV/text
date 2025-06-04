@@ -226,7 +226,6 @@ pub async fn create_charge(
         }
     };
     let response = client.make_request(Method::POST, PATH, Some(body)).await?;
-    let s = 34;
     let status_code = response.status().as_u16();
     let body = match response.text().await {
         Ok(body) => body,
